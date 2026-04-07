@@ -1,0 +1,81 @@
+import { CalendarRange, ClipboardList, Gift, LayoutDashboard, LogOut, Repeat2, Sparkles, Users2 } from 'lucide-react'
+import { NavLink, Outlet } from 'react-router-dom'
+import { useAppStore, useSessionUser } from '../store/app-store'
+import { cn } from '../utils/cn'
+
+const navItems = [
+  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
+  { to: '/admin/standard-tasks', label: 'Recurring Tasks', icon: Repeat2 },
+  { to: '/admin/assignments', label: 'Assignments', icon: CalendarRange },
+  { to: '/admin/volunteers', label: 'Volunteers', icon: Users2 },
+  { to: '/admin/cleaners', label: 'Cleaning Staff', icon: Users2 },
+  { to: '/admin/cleaning-tasks', label: 'Cleaning Tasks', icon: Sparkles },
+  { to: '/admin/rewards', label: 'Rewards', icon: Gift },
+]
+
+export const AdminLayout = () => {
+  const user = useSessionUser()
+  const logout = useAppStore((state) => state.logout)
+
+  return (
+    <div className="min-h-screen bg-shell">
+      <div className="mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="hidden h-screen overflow-y-auto border-r border-white/60 bg-admin px-6 py-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col">
+          <div className="rounded-[28px] border border-white/10 bg-white/8 p-6 backdrop-blur">
+            <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
+            <h1 className="mt-3 font-display text-3xl font-semibold">Hostel Control Hub</h1>
+            <p className="mt-3 text-sm text-white/70">
+              Operations, volunteers, assignments, and rewards in one live workspace.
+            </p>
+          </div>
+          <nav className="mt-8 grid gap-2">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/admin'}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/70 transition',
+                      isActive ? 'bg-white text-ink shadow-soft' : 'hover:bg-white/10 hover:text-white',
+                    )
+                  }
+                >
+                  <Icon size={18} />
+                  {item.label}
+                </NavLink>
+              )
+            })}
+          </nav>
+          <button
+            onClick={logout}
+            className="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-white/80 hover:bg-white/10"
+          >
+            <LogOut size={18} />
+            Sign out
+          </button>
+        </aside>
+        <main className="flex min-h-screen flex-col">
+          <header className="sticky top-0 z-20 border-b border-white/60 bg-white/80 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-teal">Admin backoffice</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-ink">Hello, {user?.name}</p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-soft">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Workspace</p>
+                <p className="mt-1 font-semibold text-ink">Connected and running live</p>
+              </div>
+            </div>
+          </header>
+          <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
