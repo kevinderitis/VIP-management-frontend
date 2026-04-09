@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react'
-import { ArrowRight, KeyRound, ShieldCheck, Sparkles, Trophy, UserRound } from 'lucide-react'
+import { ArrowRight, Download, KeyRound, ShieldCheck, Sparkles, Trophy, UserRound } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { Button } from '../../components/common/Button'
+import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
 import { useAppStore, useSessionUser } from '../../store/app-store'
 import { roleHomePath } from '../../utils/constants'
 
@@ -12,6 +13,8 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [installMessage, setInstallMessage] = useState('')
+  const pwaInstall = usePwaInstallPrompt()
 
   if (sessionUser) {
     return <Navigate to={roleHomePath[sessionUser.role]} replace />
@@ -29,6 +32,11 @@ export const LoginPage = () => {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleAndroidInstall = async () => {
+    const outcome = await pwaInstall.install()
+    setInstallMessage(outcome === 'accepted' ? 'App installation started.' : 'Installation was dismissed.')
   }
 
   return (
@@ -85,6 +93,44 @@ export const LoginPage = () => {
               <div className="mt-4 rounded-[22px] bg-mist px-4 py-3 text-sm text-slate-600 lg:hidden">
                 Volunteers use this login to enter their mobile workspace quickly and safely.
               </div>
+
+              {pwaInstall.shouldShowInstallCard ? (
+                <div className="mt-5 rounded-[24px] border border-teal/15 bg-[linear-gradient(180deg,_#f3fbfb_0%,_#eef7f8_100%)] px-4 py-4 text-sm text-slate-600 lg:hidden">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl bg-white p-2 text-teal shadow-soft">
+                      <Download size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-ink">Install the mobile app</p>
+                      <p className="mt-1">
+                        This is for volunteers and cleaning staff. Admins should continue using the web backoffice.
+                      </p>
+
+                      {pwaInstall.canInstallOnAndroid ? (
+                        <div className="mt-3 grid gap-2">
+                          <Button type="button" variant="secondary" onClick={() => void handleAndroidInstall()}>
+                            Install on Android
+                          </Button>
+                          <p className="text-xs text-slate-500">
+                            Use the installed app for faster access, notifications, and a full-screen mobile experience.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {pwaInstall.shouldShowIOSInstructions ? (
+                        <div className="mt-3 rounded-[20px] bg-white/80 px-4 py-3">
+                          <p className="font-medium text-ink">Install on iPhone</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            In Safari, tap the Share button and choose <span className="font-semibold text-ink">Add to Home Screen</span>.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {installMessage ? <p className="mt-3 text-xs font-medium text-teal">{installMessage}</p> : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <form onSubmit={handleSubmit} className="mt-8 grid gap-4">
                 <label className="grid gap-2 text-sm font-medium text-ink">

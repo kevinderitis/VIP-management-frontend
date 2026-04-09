@@ -2,10 +2,12 @@ import { useMemo, useRef, useState } from 'react'
 import { CalendarClock, CalendarDays, ChevronDown, Clock3, Repeat2 } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
+import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { TaskCard } from '../../components/volunteer/TaskCard'
 import { useAppStore, useSessionUser } from '../../store/app-store'
+import { Task } from '../../types/models'
 import { formatDate, formatDateTime, formatTimeRange, formatWeekday } from '../../utils/format'
 
 const getLocalDateValue = (value = new Date()) => {
@@ -29,6 +31,7 @@ export const VolunteerMyTasksPage = () => {
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const [filterMode, setFilterMode] = useState<'all' | 'today' | 'date'>('all')
   const [selectedDate, setSelectedDate] = useState(getLocalDateValue)
+  const [pendingCompletionTask, setPendingCompletionTask] = useState<Task | null>(null)
 
   const tasks = useMemo(
     () =>
@@ -111,6 +114,15 @@ export const VolunteerMyTasksPage = () => {
     },
     [filteredTasks, routineAssignments, user?.id],
   )
+
+  const handleCompleteTask = (task: Task) => {
+    if (!user) return
+    if (task.bedTask) {
+      setPendingCompletionTask(task)
+      return
+    }
+    void completeTask(task.id, user.id)
+  }
 
   return (
     <div className="grid gap-6">
@@ -271,7 +283,7 @@ export const VolunteerMyTasksPage = () => {
                               </div>
                               <div className="flex flex-col gap-2 sm:min-w-[180px]">
                                 {task.status === 'assigned' && user ? (
-                                  <Button size="sm" onClick={() => completeTask(task.id, user.id)}>
+                                  <Button size="sm" onClick={() => handleCompleteTask(task)}>
                                     Mark as completed
                                   </Button>
                                 ) : null}
@@ -295,7 +307,7 @@ export const VolunteerMyTasksPage = () => {
                   key={task.id}
                   task={task}
                   actionLabel={task.status === 'assigned' ? 'Mark as completed' : undefined}
-                  onAction={task.status === 'assigned' && user ? () => completeTask(task.id, user.id) : undefined}
+                  onAction={task.status === 'assigned' && user ? () => handleCompleteTask(task) : undefined}
                   secondaryActionLabel={user ? 'Release task' : undefined}
                   onSecondaryAction={user ? () => releaseTask(task.id, user.id) : undefined}
                 />
@@ -320,6 +332,35 @@ export const VolunteerMyTasksPage = () => {
           description="Claim something from the shared board or wait for an admin assignment."
         />
       )}
+
+      {pendingCompletionTask && user ? (
+        <Modal
+          open
+          onClose={() => setPendingCompletionTask(null)}
+          title="Set the final bed status"
+          description={`Choose how ${pendingCompletionTask.cleaningBedNumber ? `bed ${pendingCompletionTask.cleaningBedNumber} in ${pendingCompletionTask.cleaningRoomCode ? `room ${pendingCompletionTask.cleaningRoomCode}` : `room ${pendingCompletionTask.cleaningRoomNumber}`}` : pendingCompletionTask.cleaningRoomCode ? `room ${pendingCompletionTask.cleaningRoomCode}` : `room ${pendingCompletionTask.cleaningRoomNumber}`} should appear after you complete this task.`}
+        >
+          <div className="grid gap-3">
+            <Button
+              onClick={() => {
+                void completeTask(pendingCompletionTask.id, user.id, 'READY')
+                setPendingCompletionTask(null)
+              }}
+            >
+              Leave it ready
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void completeTask(pendingCompletionTask.id, user.id, 'OCCUPIED')
+                setPendingCompletionTask(null)
+              }}
+            >
+              Mark it occupied
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }

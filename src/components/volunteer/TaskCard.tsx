@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronDown, Clock3, Coins, ScrollText, Sparkles, Trophy } from 'lucide-react'
+import { BedDouble, CalendarDays, ChevronDown, Clock3, Coins, ScrollText, Sparkles, Trophy } from 'lucide-react'
 import { Task } from '../../types/models'
 import { formatDate, formatDateTime, formatTimeRange } from '../../utils/format'
 import { PriorityBadge, StatusBadge } from '../common/Badge'
@@ -43,6 +43,13 @@ export const TaskCard = ({
               <Clock3 size={13} />
               {formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)}
             </span>
+            {task.bedTask && (task.cleaningRoomCode || task.cleaningRoomNumber) ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-sky-800">
+                <BedDouble size={13} />
+                {task.cleaningRoomCode ? `Room ${task.cleaningRoomCode}` : `Room ${task.cleaningRoomNumber}`}
+                {task.cleaningBedNumber ? ` · Bed ${task.cleaningBedNumber}` : ''}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition group-open:rotate-180">

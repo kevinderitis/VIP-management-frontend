@@ -7,6 +7,7 @@ import {
   CleaningArea,
   CleaningPlaceStatus,
   CleaningPlaceStatusDraftInput,
+  CleaningRoom,
   CleaningTaskDraftInput,
   PackAssignment,
   Redemption,
@@ -36,6 +37,7 @@ type ServerState = {
   taskHistory: TaskCompletionRecord[]
   cleaningAreas: CleaningArea[]
   cleaningPlaceStatuses: CleaningPlaceStatus[]
+  cleaningRooms: CleaningRoom[]
   rewards: Reward[]
   redemptions: Redemption[]
   activities: ActivityItem[]
@@ -59,7 +61,7 @@ type AppState = ServerState & {
   assignTask: (taskId: string, volunteerId: string) => Promise<void>
   takeTask: (taskId: string, volunteerId: string) => Promise<void>
   releaseTask: (taskId: string, volunteerId: string) => Promise<void>
-  completeTask: (taskId: string, volunteerId: string) => Promise<void>
+  completeTask: (taskId: string, volunteerId: string, resultingBedState?: 'READY' | 'OCCUPIED') => Promise<void>
   createVolunteer: (input: VolunteerDraftInput) => Promise<void>
   updateVolunteer: (userId: string, input: VolunteerDraftInput) => Promise<void>
   toggleVolunteer: (userId: string) => Promise<void>
@@ -72,6 +74,7 @@ type AppState = ServerState & {
   updateCleaningArea: (areaId: string, name: string) => Promise<void>
   toggleCleaningArea: (areaId: string) => Promise<void>
   deleteCleaningArea: (areaId: string) => Promise<void>
+  createCleaningRoom: (input: { code: string; section: string; roomType: 'private' | 'shared'; bedCount: number }) => Promise<void>
   upsertCleaningPlaceStatus: (input: CleaningPlaceStatusDraftInput) => Promise<void>
   createCleaningTask: (input: CleaningTaskDraftInput) => Promise<void>
   updateCleaningTask: (taskId: string, input: CleaningTaskDraftInput) => Promise<void>
@@ -123,6 +126,7 @@ const emptyServerState: ServerState = {
   taskHistory: [],
   cleaningAreas: [],
   cleaningPlaceStatuses: [],
+  cleaningRooms: [],
   rewards: [],
   redemptions: [],
   activities: [],
@@ -221,16 +225,27 @@ const mapCleaningTaskInput = (input: CleaningTaskDraftInput) => ({
   cleaningLocationType: toApiEnum(input.cleaningLocationType),
   cleaningLocationLabel: input.cleaningLocationLabel,
   cleaningRoomNumber: input.cleaningRoomNumber || undefined,
+  cleaningRoomCode: input.cleaningRoomCode || undefined,
+  cleaningRoomSection: input.cleaningRoomSection || undefined,
 })
 
 const mapCleaningPlaceStatusInput = (input: CleaningPlaceStatusDraftInput) => ({
   placeType: toApiEnum(input.placeType),
   roomNumber: input.roomNumber || undefined,
+  roomCode: input.roomCode || undefined,
+  roomSection: input.roomSection || undefined,
+  roomType: toApiEnum(input.roomType),
   cleaningAreaId: input.cleaningAreaId || undefined,
   placeLabel: input.placeLabel,
   label: input.label,
   color: input.color,
+  beds: input.beds?.map((bed) => ({
+    bedNumber: bed.bedNumber,
+    label: bed.label,
+    color: bed.color,
+  })),
   assignCleanerId: input.assignCleanerId || undefined,
+  assignVolunteerId: input.assignVolunteerId || undefined,
 })
 
 const mapGroupInput = (input: TaskGroupDraftInput) => ({
@@ -451,10 +466,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
   },
 
-  completeTask: async (taskId) => {
+  completeTask: async (taskId, _volunteerId, resultingBedState) => {
     await apiRequest(`/tasks/${taskId}/complete`, {
       method: 'POST',
       token: get().accessToken,
+      body: resultingBedState ? { resultingBedState } : {},
     })
     await get().refreshState()
     set((state) => ({
@@ -624,16 +640,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
   },
 
-  upsertCleaningPlaceStatus: async (input) => {
-    await apiRequest('/cleaning-place-statuses/upsert', {
+  createCleaningRoom: async (input) => {
+    await apiRequest('/cleaning-rooms', {
       method: 'POST',
       token: get().accessToken,
-      body: mapCleaningPlaceStatusInput(input),
+      body: {
+        code: input.code,
+        section: input.section,
+        roomType: toApiEnum(input.roomType),
+        bedCount: input.bedCount,
+      },
     })
     await get().refreshState()
     set((state) => ({
-      toasts: addToast(state.toasts, 'Place status updated', 'The cleaning map reflects the new status color immediately.', 'info'),
+      toasts: addToast(state.toasts, 'Room added', 'The room now appears on the cleaning board.'),
     }))
+  },
+
+  upsertCleaningPlaceStatus: async (input) => {
+    try {
+      await apiRequest('/cleaning-place-statuses/upsert', {
+        method: 'POST',
+        token: get().accessToken,
+        body: mapCleaningPlaceStatusInput(input),
+      })
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(state.toasts, 'Place status updated', 'The cleaning map reflects the new status color immediately.', 'info'),
+      }))
+    } catch (error) {
+      set((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Could not update place status',
+          error instanceof Error ? error.message : 'The room board update failed.',
+          'warning',
+        ),
+      }))
+    }
   },
 
   createCleaningTask: async (input) => {

@@ -26,6 +26,14 @@ export type Weekday =
   | 'sunday'
 export type TaskAudience = 'volunteer' | 'cleaning'
 export type CleaningLocationType = 'room' | 'custom'
+export type RoomType = 'private' | 'shared'
+export type BedState = 'ready' | 'needs-making' | 'occupied'
+
+export interface BedStatus {
+  bedNumber: number
+  label: string
+  color: string
+}
 
 export interface User {
   id: string
@@ -59,6 +67,7 @@ export interface Task {
   scheduledAt?: string
   endsAt?: string
   assignedTo?: string
+  lastAssignedTo?: string
   createdBy: string
   notes?: string
   source: 'manual' | 'pack' | 'routine'
@@ -69,6 +78,10 @@ export interface Task {
   cleaningLocationType?: CleaningLocationType
   cleaningLocationLabel?: string
   cleaningRoomNumber?: number
+  cleaningRoomCode?: string
+  cleaningRoomSection?: string
+  cleaningBedNumber?: number
+  bedTask?: boolean
 }
 
 export interface CleaningArea {
@@ -77,14 +90,30 @@ export interface CleaningArea {
   isActive: boolean
 }
 
+export interface CleaningRoom {
+  id: string
+  code: string
+  section: string
+  label: string
+  roomType: RoomType
+  bedCount: number
+  isActive: boolean
+}
+
 export interface CleaningPlaceStatus {
   id: string
   placeType: CleaningLocationType
   roomNumber?: number
+  roomCode?: string
+  roomSection?: string
+  roomType?: RoomType
   cleaningAreaId?: string
   placeLabel: string
   label: string
   color: string
+  roomServiceLabel?: string
+  roomServiceColor?: string
+  beds: BedStatus[]
 }
 
 export interface TaskGroupTemplate {
@@ -219,6 +248,8 @@ export interface CleaningTaskDraftInput {
   cleaningLocationType: CleaningLocationType
   cleaningLocationLabel: string
   cleaningRoomNumber?: number
+  cleaningRoomCode?: string
+  cleaningRoomSection?: string
 }
 
 export interface VolunteerDraftInput {
@@ -244,11 +275,16 @@ export interface CleanerDraftInput {
 export interface CleaningPlaceStatusDraftInput {
   placeType: CleaningLocationType
   roomNumber?: number
+  roomCode?: string
+  roomSection?: string
+  roomType?: RoomType
   cleaningAreaId?: string
   placeLabel: string
   label: string
   color: string
+  beds?: BedStatus[]
   assignCleanerId?: string
+  assignVolunteerId?: string
 }
 
 export interface RewardDraftInput {

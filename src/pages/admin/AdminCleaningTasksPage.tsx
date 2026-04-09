@@ -1,27 +1,28 @@
-import { useMemo, useState } from 'react'
-import { Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserPlus } from 'lucide-react'
+import { FormEvent, useMemo, useState } from 'react'
+import { BedDouble, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserPlus } from 'lucide-react'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
 import { CleaningTaskAssignmentModal } from '../../components/admin/CleaningTaskAssignmentModal'
 import { CleaningTaskEditorModal } from '../../components/admin/CleaningTaskEditorModal'
+import { RoomStatusModal } from '../../components/admin/RoomStatusModal'
 import { PriorityBadge, StatusBadge } from '../../components/common/Badge'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
+import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
-import { useAppStore, useCleanerUsers } from '../../store/app-store'
-import { CleaningArea, CleaningPlaceStatusDraftInput, Task } from '../../types/models'
+import { useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
+import { CleaningArea, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 import { formatDateTime, formatTimeRange } from '../../utils/format'
 
-const roomRanges = [
-  { label: '1-100', start: 1 },
-  { label: '101-200', start: 101 },
-  { label: '201-300', start: 201 },
-]
+const sectionOrder = ['Arena Hostel', 'Arena Boutique / Seaview', 'Le Club']
+
+const fallbackStatus = { label: 'No status', color: '#cbd5e1', beds: [] }
 
 export const AdminCleaningTasksPage = () => {
   const tasks = useAppStore((state) => state.tasks)
   const cleaningAreas = useAppStore((state) => state.cleaningAreas)
+  const cleaningRooms = useAppStore((state) => state.cleaningRooms)
   const cleaningPlaceStatuses = useAppStore((state) => state.cleaningPlaceStatuses)
   const createCleaningTask = useAppStore((state) => state.createCleaningTask)
   const updateCleaningTask = useAppStore((state) => state.updateCleaningTask)
@@ -33,20 +34,37 @@ export const AdminCleaningTasksPage = () => {
   const updateCleaningArea = useAppStore((state) => state.updateCleaningArea)
   const toggleCleaningArea = useAppStore((state) => state.toggleCleaningArea)
   const deleteCleaningArea = useAppStore((state) => state.deleteCleaningArea)
+  const createCleaningRoom = useAppStore((state) => state.createCleaningRoom)
   const upsertCleaningPlaceStatus = useAppStore((state) => state.upsertCleaningPlaceStatus)
   const cleaners = useCleanerUsers()
+  const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [roomTypeFilter, setRoomTypeFilter] = useState<'all' | 'private' | 'shared'>('all')
+  const [sectionFilter, setSectionFilter] = useState<'all' | string>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [areaOpen, setAreaOpen] = useState(false)
+  const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [assignmentTask, setAssignmentTask] = useState<Task | null>(null)
   const [selectedArea, setSelectedArea] = useState<CleaningArea | null>(null)
-  const [selectedRoomRange, setSelectedRoomRange] = useState(1)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
+  const [roomModalOpen, setRoomModalOpen] = useState(false)
+  const [selectedRoom, setSelectedRoom] = useState<CleaningRoom | null>(null)
   const [selectedPlace, setSelectedPlace] = useState<Omit<CleaningPlaceStatusDraftInput, 'label' | 'color'> | null>(null)
+  const [newRoom, setNewRoom] = useState<{
+    code: string
+    section: string
+    roomType: 'private' | 'shared'
+    bedCount: number
+  }>({
+    code: '',
+    section: 'Arena Hostel',
+    roomType: 'private' as const,
+    bedCount: 4,
+  })
 
   const cleaningTasks = useMemo(
     () => tasks.filter((task) => task.audience === 'cleaning' && task.status !== 'completed'),
@@ -61,37 +79,53 @@ export const AdminCleaningTasksPage = () => {
         const matchesSearch =
           task.title.toLowerCase().includes(searchValue) ||
           task.description.toLowerCase().includes(searchValue) ||
-          (task.cleaningLocationLabel ?? '').toLowerCase().includes(searchValue)
+          (task.cleaningLocationLabel ?? '').toLowerCase().includes(searchValue) ||
+          (task.cleaningRoomCode ?? '').toLowerCase().includes(searchValue)
         return matchesStatus && matchesSearch
       }),
     [cleaningTasks, search, statusFilter],
   )
 
-  const roomSquares = useMemo(() => {
-    const squares = Array.from({ length: 100 }, (_, index) => selectedRoomRange + index)
-    return squares.map((roomNumber) => {
-      const roomLabel = `Room ${roomNumber}`
-      const customStatus = cleaningPlaceStatuses.find(
-        (status) => status.placeType === 'room' && status.roomNumber === roomNumber,
-      )
-      const relatedTasks = cleaningTasks.filter(
-        (task) => task.cleaningLocationType === 'room' && task.cleaningRoomNumber === roomNumber,
-      )
+  const groupedRooms = useMemo(() => {
+    const searchValue = search.trim().toLowerCase()
+    const rooms = cleaningRooms.filter((room) => {
+      if (!room.isActive) return false
+      if (roomTypeFilter !== 'all' && room.roomType !== roomTypeFilter) return false
+      if (sectionFilter !== 'all' && room.section !== sectionFilter) return false
+      if (!searchValue) return true
 
-      const fallback =
-        relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
-          ? { label: 'Needs cleaning', color: '#ef4444' }
-          : relatedTasks.find((task) => task.status === 'completed')
-            ? { label: 'Clean', color: '#22c55e' }
-            : { label: 'No status', color: '#cbd5e1' }
-
-      return {
-        roomNumber,
-        roomLabel,
-        status: customStatus ?? fallback,
-      }
+      return (
+        room.code.toLowerCase().includes(searchValue) ||
+        room.label.toLowerCase().includes(searchValue) ||
+        room.section.toLowerCase().includes(searchValue)
+      )
     })
-  }, [cleaningPlaceStatuses, cleaningTasks, selectedRoomRange])
+
+    const grouped = sectionOrder.map((section) => ({
+      section,
+      rooms: rooms
+        .filter((room) => room.section === section)
+        .map((room) => {
+          const customStatus = cleaningPlaceStatuses.find(
+            (status) => status.placeType === 'room' && status.roomCode === room.code,
+          )
+          const relatedTasks = tasks.filter(
+            (task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === room.code,
+          )
+          const derivedStatus =
+            customStatus ??
+            (relatedTasks.find((task) => task.bedTask && ['assigned', 'available', 'scheduled'].includes(task.status))
+              ? { label: 'Needs making', color: '#ef4444', beds: [], roomType: room.roomType }
+              : relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
+                ? { label: 'Needs cleaning', color: '#ef4444', beds: [], roomType: room.roomType }
+                : fallbackStatus)
+
+          return { room, status: derivedStatus }
+        }),
+    }))
+
+    return grouped.filter((group) => group.rooms.length > 0)
+  }, [cleaningPlaceStatuses, cleaningRooms, roomTypeFilter, search, sectionFilter, tasks])
 
   const customPlaceCards = useMemo(
     () =>
@@ -102,17 +136,13 @@ export const AdminCleaningTasksPage = () => {
         const relatedTasks = cleaningTasks.filter(
           (task) => task.cleaningLocationType === 'custom' && task.cleaningLocationLabel === area.name,
         )
-        const fallback =
-          relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
-            ? { label: 'Needs cleaning', color: '#ef4444' }
-            : relatedTasks.find((task) => task.status === 'completed')
-              ? { label: 'Clean', color: '#22c55e' }
-              : { label: 'No status', color: '#cbd5e1' }
+        const status =
+          customStatus ??
+          (relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
+            ? { label: 'Needs cleaning', color: '#ef4444', beds: [] }
+            : fallbackStatus)
 
-        return {
-          area,
-          status: customStatus ?? fallback,
-        }
+        return { area, status }
       }),
     [cleaningAreas, cleaningPlaceStatuses, cleaningTasks],
   )
@@ -121,19 +151,40 @@ export const AdminCleaningTasksPage = () => {
     if (!selectedPlace) return undefined
     return cleaningPlaceStatuses.find((status) =>
       selectedPlace.placeType === 'room'
-        ? status.placeType === 'room' && status.roomNumber === selectedPlace.roomNumber
+        ? status.placeType === 'room' && status.roomCode === selectedPlace.roomCode
         : status.placeType === 'custom' && status.cleaningAreaId === selectedPlace.cleaningAreaId,
     )
   }, [cleaningPlaceStatuses, selectedPlace])
+
+  const currentRoomStatus = useMemo(() => {
+    if (!selectedRoom) return undefined
+    return cleaningPlaceStatuses.find((status) => status.placeType === 'room' && status.roomCode === selectedRoom.code)
+  }, [cleaningPlaceStatuses, selectedRoom])
+
+  const handleCreateRoom = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void createCleaningRoom({
+      code: newRoom.code.trim(),
+      section: newRoom.section,
+      roomType: newRoom.roomType,
+      bedCount: newRoom.roomType === 'private' ? 1 : newRoom.bedCount,
+    })
+    setRoomCreateOpen(false)
+    setNewRoom({ code: '', section: 'Arena Hostel', roomType: 'private', bedCount: 4 })
+  }
 
   return (
     <div className="grid gap-6">
       <SectionHeader
         eyebrow="Cleaning ops"
         title="Cleaning service tasks"
-        description="Create room or custom-place cleaning tasks, assign them to cleaning staff, and manage cleaning conditions visually."
+        description="Manage cleaning work, grouped room boards, custom places, and bed-making requests for volunteers."
         action={
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setRoomCreateOpen(true)}>
+              <BedDouble size={16} className="mr-2" />
+              New room
+            </Button>
             <Button
               variant="secondary"
               onClick={() => {
@@ -164,7 +215,7 @@ export const AdminCleaningTasksPage = () => {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by title, description, or location"
+              placeholder="Search by title, description, room code, or location"
               className="w-full rounded-2xl border-slate-200 pl-11"
             />
           </label>
@@ -184,54 +235,96 @@ export const AdminCleaningTasksPage = () => {
       </Panel>
 
       <Panel className="p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <Grid2X2 size={18} className="text-teal" />
-              <h3 className="section-title">Room map</h3>
-            </div>
-            <p className="mt-2 text-sm text-slate-500">
-              Use colors to track room and place conditions. Setting a place to Need cleaning will open or republish a cleaning task automatically.
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Grid2X2 size={18} className="text-teal" />
+          <h3 className="section-title">Room board</h3>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
+        </p>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[auto_auto] lg:items-start lg:justify-between">
           <div className="flex flex-wrap gap-2">
-            {roomRanges.map((range) => (
+            <Button
+              size="sm"
+              variant={roomTypeFilter === 'all' ? 'primary' : 'secondary'}
+              onClick={() => setRoomTypeFilter('all')}
+            >
+              All rooms
+            </Button>
+            <Button
+              size="sm"
+              variant={roomTypeFilter === 'private' ? 'primary' : 'secondary'}
+              onClick={() => setRoomTypeFilter('private')}
+            >
+              Private only
+            </Button>
+            <Button
+              size="sm"
+              variant={roomTypeFilter === 'shared' ? 'primary' : 'secondary'}
+              onClick={() => setRoomTypeFilter('shared')}
+            >
+              Shared only
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={sectionFilter === 'all' ? 'primary' : 'secondary'}
+              onClick={() => setSectionFilter('all')}
+            >
+              All locations
+            </Button>
+            {sectionOrder.map((section) => (
               <Button
-                key={range.start}
-                variant={selectedRoomRange === range.start ? 'primary' : 'secondary'}
+                key={section}
                 size="sm"
-                onClick={() => setSelectedRoomRange(range.start)}
+                variant={sectionFilter === section ? 'primary' : 'secondary'}
+                onClick={() => setSectionFilter(section)}
               >
-                {range.label}
+                {section}
               </Button>
             ))}
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-10">
-          {roomSquares.map((room) => (
-            <button
-              key={room.roomNumber}
-              type="button"
-              onClick={() => {
-                setSelectedPlace({
-                  placeType: 'room',
-                  roomNumber: room.roomNumber,
-                  placeLabel: room.roomLabel,
-                })
-                setStatusModalOpen(true)
-              }}
-              className="rounded-2xl px-2 py-3 text-center text-xs font-semibold text-white shadow-soft transition hover:-translate-y-0.5"
-              style={{ backgroundColor: room.status.color }}
-              title={`${room.roomLabel} · ${room.status.label}`}
-            >
-              {room.roomNumber}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
-          <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#22c55e]" />Clean</span>
-          <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#ef4444]" />Needs cleaning</span>
-          <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[#3b82f6]" />Custom state</span>
+
+        <div className="mt-6 grid gap-6">
+          {groupedRooms.length ? groupedRooms.map((group) => (
+            <div key={group.section} className="grid gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="font-display text-xl font-semibold text-ink">{group.section}</h4>
+                <span className="text-sm text-slate-500">{group.rooms.length} rooms</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
+                {group.rooms.map(({ room, status }) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoom(room)
+                      setRoomModalOpen(true)
+                    }}
+                    className="rounded-[24px] px-4 py-4 text-left text-white shadow-soft transition hover:-translate-y-0.5"
+                    style={{ backgroundColor: status.color }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-display text-xl font-semibold">{room.code}</p>
+                        <p className="mt-1 text-xs font-medium text-white/85">{room.roomType === 'shared' ? `${room.bedCount} beds` : 'Private room'}</p>
+                      </div>
+                      {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
+                    </div>
+                    <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">{status.label}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-5 py-8 text-sm text-slate-500">
+              No rooms match the selected filters.
+            </div>
+          )}
         </div>
       </Panel>
 
@@ -312,7 +405,7 @@ export const AdminCleaningTasksPage = () => {
                       <StatusBadge status={task.status} />
                       <PriorityBadge priority={task.priority} />
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {task.cleaningLocationLabel}
+                        {task.cleaningRoomCode ?? task.cleaningLocationLabel}
                       </span>
                     </div>
                     <h3 className="mt-3 font-display text-xl font-semibold text-ink">{task.title}</h3>
@@ -381,6 +474,7 @@ export const AdminCleaningTasksPage = () => {
         onClose={() => setModalOpen(false)}
         task={selectedTask}
         customAreas={cleaningAreas}
+        rooms={cleaningRooms.filter((room) => room.isActive)}
         onSubmit={(input) => {
           if (selectedTask) {
             void updateCleaningTask(selectedTask.id, input)
@@ -417,7 +511,7 @@ export const AdminCleaningTasksPage = () => {
 
       {selectedPlace ? (
         <CleaningPlaceStatusModal
-          key={`${selectedPlace.placeType}-${selectedPlace.roomNumber ?? selectedPlace.cleaningAreaId ?? selectedPlace.placeLabel}`}
+          key={`${selectedPlace.placeType}-${selectedPlace.roomCode ?? selectedPlace.cleaningAreaId ?? selectedPlace.placeLabel}`}
           open={statusModalOpen}
           onClose={() => setStatusModalOpen(false)}
           place={selectedPlace}
@@ -426,6 +520,90 @@ export const AdminCleaningTasksPage = () => {
           onSubmit={(input) => void upsertCleaningPlaceStatus(input)}
         />
       ) : null}
+
+      {selectedRoom ? (
+        <RoomStatusModal
+          key={`${selectedRoom.id}-${roomModalOpen ? 'open' : 'closed'}`}
+          open={roomModalOpen}
+          onClose={() => setRoomModalOpen(false)}
+          room={selectedRoom}
+          currentStatus={currentRoomStatus}
+          cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
+          volunteers={volunteers}
+          roomTasks={tasks.filter((task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === selectedRoom.code)}
+          onSubmit={(input) => void upsertCleaningPlaceStatus(input)}
+        />
+      ) : null}
+
+      <Modal
+        open={roomCreateOpen}
+        onClose={() => setRoomCreateOpen(false)}
+        title="New room"
+        description="Add a new room to one of the properties so it appears in the cleaning board."
+      >
+        <form onSubmit={handleCreateRoom} className="grid gap-4">
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Room code
+            <input
+              required
+              value={newRoom.code}
+              onChange={(event) => setNewRoom((current) => ({ ...current, code: event.target.value }))}
+              className="rounded-2xl border-slate-200"
+              placeholder="41d or F8"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Property
+            <select
+              value={newRoom.section}
+              onChange={(event) => setNewRoom((current) => ({ ...current, section: event.target.value }))}
+              className="rounded-2xl border-slate-200"
+            >
+              {sectionOrder.map((section) => (
+                <option key={section} value={section}>
+                  {section}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-ink">
+              Room type
+              <select
+                value={newRoom.roomType}
+                onChange={(event) =>
+                  setNewRoom((current) => ({
+                    ...current,
+                    roomType: event.target.value as 'private' | 'shared',
+                  }))
+                }
+                className="rounded-2xl border-slate-200"
+              >
+                <option value="private">Private</option>
+                <option value="shared">Shared dorm</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-ink">
+              Beds
+              <input
+                type="number"
+                min={1}
+                max={14}
+                value={newRoom.roomType === 'private' ? 1 : newRoom.bedCount}
+                onChange={(event) => setNewRoom((current) => ({ ...current, bedCount: Number(event.target.value) }))}
+                className="rounded-2xl border-slate-200"
+                disabled={newRoom.roomType === 'private'}
+              />
+            </label>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setRoomCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">Add room</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

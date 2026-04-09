@@ -1,7 +1,8 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { toDateTimeLocal } from '../../utils/format'
 import {
   CleaningArea,
+  CleaningRoom,
   CleaningTaskDraftInput,
   Task,
   TaskCategory,
@@ -23,8 +24,7 @@ const emptyForm: CleaningTaskDraftInput = {
   scheduledAt: '',
   endsAt: '',
   cleaningLocationType: 'room',
-  cleaningLocationLabel: 'Room 1',
-  cleaningRoomNumber: 1,
+  cleaningLocationLabel: '',
 }
 
 const taskToForm = (task?: Task | null): CleaningTaskDraftInput =>
@@ -39,8 +39,10 @@ const taskToForm = (task?: Task | null): CleaningTaskDraftInput =>
         scheduledAt: toDateTimeLocal(task.scheduledAt),
         endsAt: toDateTimeLocal(task.endsAt),
         cleaningLocationType: task.cleaningLocationType ?? 'room',
-        cleaningLocationLabel: task.cleaningLocationLabel ?? 'Room 1',
-        cleaningRoomNumber: task.cleaningRoomNumber ?? 1,
+        cleaningLocationLabel: task.cleaningLocationLabel ?? '',
+        cleaningRoomNumber: task.cleaningRoomNumber,
+        cleaningRoomCode: task.cleaningRoomCode,
+        cleaningRoomSection: task.cleaningRoomSection,
       }
     : emptyForm
 
@@ -49,12 +51,14 @@ export const CleaningTaskEditorModal = ({
   onClose,
   task,
   customAreas,
+  rooms,
   onSubmit,
 }: {
   open: boolean
   onClose: () => void
   task?: Task | null
   customAreas: CleaningArea[]
+  rooms: CleaningRoom[]
   onSubmit: (input: CleaningTaskDraftInput) => void
 }) => {
   const [form, setForm] = useState<CleaningTaskDraftInput>(() => taskToForm(task))
@@ -67,6 +71,17 @@ export const CleaningTaskEditorModal = ({
     () => customAreas.filter((area) => area.isActive),
     [customAreas],
   )
+  const availableRooms = useMemo(() => rooms.filter((room) => room.isActive), [rooms])
+
+  useEffect(() => {
+    if (task || form.cleaningLocationType !== 'room' || form.cleaningRoomCode || !availableRooms[0]) return
+    setForm((prev) => ({
+      ...prev,
+      cleaningRoomCode: availableRooms[0].code,
+      cleaningRoomSection: availableRooms[0].section,
+      cleaningLocationLabel: availableRooms[0].label,
+    }))
+  }, [availableRooms, form.cleaningLocationType, form.cleaningRoomCode, task])
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -193,13 +208,16 @@ export const CleaningTaskEditorModal = ({
                 const nextType = event.target.value as CleaningTaskDraftInput['cleaningLocationType']
                 const fallbackLabel =
                   nextType === 'room'
-                    ? 'Room 1'
+                    ? availableRooms[0]?.label ?? ''
                     : availableCustomAreas[0]?.name ?? ''
+                const fallbackRoom = availableRooms[0]
                 setForm((prev) => ({
                   ...prev,
                   cleaningLocationType: nextType,
                   cleaningLocationLabel: fallbackLabel,
-                  cleaningRoomNumber: nextType === 'room' ? 1 : undefined,
+                  cleaningRoomNumber: nextType === 'room' ? undefined : undefined,
+                  cleaningRoomCode: nextType === 'room' ? fallbackRoom?.code : undefined,
+                  cleaningRoomSection: nextType === 'room' ? fallbackRoom?.section : undefined,
                 }))
               }}
               className="rounded-2xl border-slate-200"
@@ -226,22 +244,26 @@ export const CleaningTaskEditorModal = ({
 
         {form.cleaningLocationType === 'room' ? (
           <label className="grid gap-2 text-sm font-medium text-ink">
-            Room number
-            <input
-              type="number"
-              min={1}
-              max={300}
-              value={form.cleaningRoomNumber ?? 1}
+            Room
+            <select
+              value={form.cleaningRoomCode ?? ''}
               onChange={(event) => {
-                const roomNumber = Number(event.target.value)
+                const room = availableRooms.find((item) => item.code === event.target.value)
                 setForm((prev) => ({
                   ...prev,
-                  cleaningRoomNumber: roomNumber,
-                  cleaningLocationLabel: `Room ${roomNumber}`,
+                  cleaningRoomCode: room?.code,
+                  cleaningRoomSection: room?.section,
+                  cleaningLocationLabel: room?.label ?? '',
                 }))
               }}
               className="rounded-2xl border-slate-200"
-            />
+            >
+              {availableRooms.map((room) => (
+                <option key={room.id} value={room.code}>
+                  {room.section} · {room.code}
+                </option>
+              ))}
+            </select>
           </label>
         ) : null}
 
