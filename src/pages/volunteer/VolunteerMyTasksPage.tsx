@@ -56,7 +56,10 @@ export const VolunteerMyTasksPage = () => {
         .map((assignment) => {
           const template = routineTasks.find((item) => item.id === assignment.templateId)
           const relatedTasks = allTasks.filter(
-            (task) => task.audience === 'volunteer' && task.routineAssignmentId === assignment.id,
+            (task) =>
+              task.audience === 'volunteer' &&
+              task.routineAssignmentId === assignment.id &&
+              task.assignedTo === user?.id,
           )
           return {
             id: assignment.id,
@@ -72,7 +75,7 @@ export const VolunteerMyTasksPage = () => {
                 (left, right) =>
                   new Date(left.scheduledAt ?? left.publishedAt).getTime() -
                   new Date(right.scheduledAt ?? right.publishedAt).getTime(),
-              ),
+            ),
           }
         }),
     [allTasks, routineAssignments, routineTasks, user?.id],
@@ -95,8 +98,18 @@ export const VolunteerMyTasksPage = () => {
   }, [filterMode, recurringPlans, selectedDate, today])
 
   const standaloneTasks = useMemo(
-    () => filteredTasks.filter((task) => !task.routineAssignmentId),
-    [filteredTasks],
+    () => {
+      const ownedRoutineAssignmentIds = new Set(
+        routineAssignments
+          .filter((assignment) => assignment.volunteerId === user?.id)
+          .map((assignment) => assignment.id),
+      )
+
+      return filteredTasks.filter(
+        (task) => !task.routineAssignmentId || !ownedRoutineAssignmentIds.has(task.routineAssignmentId),
+      )
+    },
+    [filteredTasks, routineAssignments, user?.id],
   )
 
   return (

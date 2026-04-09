@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { ToastViewport } from './components/common/ToastViewport'
+import { usePwaNotifications } from './hooks/usePwaNotifications'
 import { useRealtimeSimulation } from './hooks/useRealtimeSimulation'
+import { useTaskNotifications } from './hooks/useTaskNotifications'
 import { AppRouter } from './routes/AppRouter'
 import { useAppStore } from './store/app-store'
 
@@ -9,6 +11,8 @@ function App() {
   const isReady = useAppStore((state) => state.isReady)
 
   useRealtimeSimulation()
+  usePwaNotifications()
+  useTaskNotifications()
 
   useEffect(() => {
     void initializeApp()

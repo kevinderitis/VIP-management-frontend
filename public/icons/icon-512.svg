@@ -1,8 +1,11 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="128" fill="#17314F"/>
-  <circle cx="156" cy="156" r="64" fill="#7FD1CC"/>
-  <circle cx="356" cy="156" r="64" fill="#F4B85F"/>
-  <path d="M128 294C128 246.497 166.497 208 214 208H298C345.503 208 384 246.497 384 294V316C384 363.503 345.503 402 298 402H214C166.497 402 128 363.503 128 316V294Z" fill="white"/>
-  <path d="M188 308H324" stroke="#17314F" stroke-width="28" stroke-linecap="round"/>
-  <path d="M256 242V374" stroke="#2B8A88" stroke-width="28" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#17314f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="140" fill="url(#bg)"/>
+  <path d="M131 315c0-59 43-102 103-102 17 0 32 3.3 46.6 10L319.9 165h60.4l-54 76.8c18.6 17.4 30 41.8 30 70.6 0 65.1-47 110.6-114.6 110.6S131 378.5 131 315Zm66.2 0c0 30.5 20.4 50.5 48.5 50.5 28.3 0 48.7-20 48.7-50.5 0-30.7-19.9-50.8-48.7-50.8-28.7 0-48.5 20.1-48.5 50.8Z" fill="#f8fafc"/>
+  <circle cx="371" cy="145" r="39" fill="#f59e0b"/>
 </svg>

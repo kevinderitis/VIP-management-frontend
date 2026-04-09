@@ -1,7 +1,7 @@
 {
   "name": "VolunteerFlow Hostel",
   "short_name": "VolunteerFlow",
-  "description": "Gestion de voluntarios, tareas y recompensas para hostels.",
+  "description": "Hostel operations for volunteers, cleaning shifts, assignments, and rewards.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#eef6f7",

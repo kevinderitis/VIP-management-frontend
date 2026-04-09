@@ -177,9 +177,11 @@ export interface ActivityItem {
     | 'task-created'
     | 'task-published'
     | 'task-taken'
+    | 'task-released'
     | 'task-completed'
     | 'reward-redeemed'
     | 'pack-assigned'
+    | 'routine-assigned'
     | 'volunteer-updated'
   title: string
   description: string

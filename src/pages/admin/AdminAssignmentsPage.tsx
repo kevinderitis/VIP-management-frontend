@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
-import { CalendarRange, ClipboardList, Repeat2, UserRound } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound } from 'lucide-react'
+import { Button } from '../../components/common/Button'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore } from '../../store/app-store'
@@ -10,6 +11,11 @@ export const AdminAssignmentsPage = () => {
   const users = useAppStore((state) => state.users)
   const routineTasks = useAppStore((state) => state.routineTasks)
   const routineAssignments = useAppStore((state) => state.routineAssignments)
+  const activities = useAppStore((state) => state.activities)
+  const deleteRoutineAssignment = useAppStore((state) => state.deleteRoutineAssignment)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
   const assignedTasks = useMemo(
     () =>
@@ -21,6 +27,16 @@ export const AdminAssignmentsPage = () => {
       ),
     [tasks],
   )
+
+  const filteredAssignedTasks = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return assignedTasks
+    return assignedTasks.filter(
+      (task) =>
+        task.title.toLowerCase().includes(query) ||
+        task.description.toLowerCase().includes(query),
+    )
+  }, [assignedTasks, search])
 
   const recurringAssignments = useMemo(
     () =>
@@ -46,6 +62,39 @@ export const AdminAssignmentsPage = () => {
     [routineAssignments, routineTasks, tasks, users],
   )
 
+  const filteredRecurringAssignments = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return recurringAssignments
+    return recurringAssignments.filter(
+      (assignment) =>
+        assignment.name.toLowerCase().includes(query) ||
+        assignment.volunteerName.toLowerCase().includes(query),
+    )
+  }, [recurringAssignments, search])
+
+  const assignmentHistory = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const filtered = activities.filter((activity) => {
+      if (!['task-taken', 'task-released', 'pack-assigned', 'routine-assigned'].includes(activity.type)) {
+        return false
+      }
+
+      if (!query) return true
+      return (
+        activity.title.toLowerCase().includes(query) ||
+        activity.description.toLowerCase().includes(query)
+      )
+    })
+
+    return filtered
+  }, [activities, search])
+
+  const totalPages = Math.max(1, Math.ceil(assignmentHistory.length / pageSize))
+  const paginatedHistory = useMemo(
+    () => assignmentHistory.slice((page - 1) * pageSize, page * pageSize),
+    [assignmentHistory, page],
+  )
+
   return (
     <div className="grid gap-6">
       <SectionHeader
@@ -54,6 +103,21 @@ export const AdminAssignmentsPage = () => {
         description="Track who is responsible for each individual task and each recurring assignment across the hostel."
       />
 
+      <Panel className="p-4">
+        <label className="relative block">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Filter by task name, volunteer, or assignment event"
+            className="w-full rounded-2xl border-slate-200 pl-11"
+          />
+        </label>
+      </Panel>
+
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Panel className="p-6">
           <div className="flex items-center gap-2">
@@ -61,8 +125,8 @@ export const AdminAssignmentsPage = () => {
             <h3 className="section-title">Individual tasks</h3>
           </div>
           <div className="mt-5 grid gap-3">
-            {assignedTasks.length ? (
-              assignedTasks.map((task) => {
+            {filteredAssignedTasks.length ? (
+              filteredAssignedTasks.map((task) => {
                 const volunteer = users.find((user) => user.id === task.assignedTo)
 
                 return (
@@ -100,16 +164,31 @@ export const AdminAssignmentsPage = () => {
             <h3 className="section-title">Recurring assignments</h3>
           </div>
           <div className="mt-5 grid gap-3">
-            {recurringAssignments.length ? (
-              recurringAssignments.map((assignment) => (
+            {filteredRecurringAssignments.length ? (
+              filteredRecurringAssignments.map((assignment) => (
                 <details key={assignment.id} className="group rounded-2xl bg-slate-50 px-4 py-4">
                   <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-ink">{assignment.name}</p>
                       <p className="mt-1 text-sm text-slate-500">{assignment.volunteerName}</p>
                     </div>
-                    <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                      {assignment.generatedTasks.length} slot{assignment.generatedTasks.length > 1 ? 's' : ''}
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                        {assignment.generatedTasks.length} slot{assignment.generatedTasks.length > 1 ? 's' : ''}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          if (!window.confirm(`Remove the recurring assignment "${assignment.name}" for ${assignment.volunteerName}?`)) return
+                          void deleteRoutineAssignment(assignment.id)
+                        }}
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Remove
+                      </Button>
                     </div>
                   </summary>
 
@@ -142,13 +221,59 @@ export const AdminAssignmentsPage = () => {
       </div>
 
       <Panel className="bg-admin p-6 text-white">
-        <div className="flex items-center gap-2">
-          <UserRound size={18} className="text-white" />
-          <h3 className="font-display text-2xl font-semibold">Quick control overview</h3>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <UserRound size={18} className="text-white" />
+              <h3 className="font-display text-2xl font-semibold">Assignment history</h3>
+            </div>
+            <p className="mt-3 text-sm text-white/75">
+              Review task claims, releases, and generated assignment events without overloading the screen.
+            </p>
+          </div>
+          <div className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
+            Page {page} of {totalPages}
+          </div>
         </div>
-        <p className="mt-3 text-sm text-white/75">
-          Use this area to check who owns each scheduled responsibility and catch unassigned work before the shift starts.
-        </p>
+        <div className="mt-5 grid gap-3">
+          {paginatedHistory.length ? (
+            paginatedHistory.map((activity) => (
+              <div key={activity.id} className="rounded-2xl bg-white/10 px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-semibold text-white">{activity.title}</p>
+                  <span className="text-xs uppercase tracking-[0.18em] text-white/55">
+                    {formatDateTime(activity.createdAt)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-white/75">{activity.description}</p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white/15 px-4 py-5 text-sm text-white/70">
+              No assignment history matches this filter.
+            </div>
+          )}
+        </div>
+        {totalPages > 1 ? (
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
       </Panel>
     </div>
   )

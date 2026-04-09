@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, '')
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -19,7 +20,8 @@ const buildHeaders = (token?: string) => {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     method: options.method ?? 'GET',
     headers: buildHeaders(options.token),
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

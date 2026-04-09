@@ -96,6 +96,7 @@ type AppState = ServerState & {
   updateRoutineTask: (routineTaskId: string, input: RoutineTaskDraftInput) => Promise<void>
   toggleRoutineTask: (routineTaskId: string) => Promise<void>
   deleteRoutineTask: (routineTaskId: string) => Promise<void>
+  deleteRoutineAssignment: (assignmentId: string) => Promise<void>
   assignRoutineTask: (
     routineTaskId: string,
     volunteerId: string,
@@ -941,6 +942,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Recurring task deleted', 'The recurring template and its generated entries were removed.', 'warning'),
+    }))
+  },
+
+  deleteRoutineAssignment: async (assignmentId) => {
+    await apiRequest(`/routine-tasks/assignments/${assignmentId}`, {
+      method: 'DELETE',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Recurring assignment removed', 'The assignment and its generated task slots were deleted.', 'warning'),
     }))
   },
 

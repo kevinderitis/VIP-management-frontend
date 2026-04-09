@@ -1,8 +1,11 @@
-<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="192" height="192" rx="48" fill="#17314F"/>
-  <circle cx="56" cy="58" r="24" fill="#7FD1CC"/>
-  <circle cx="136" cy="58" r="24" fill="#F4B85F"/>
-  <path d="M48 110C48 92.3269 62.3269 78 80 78H112C129.673 78 144 92.3269 144 110V118C144 135.673 129.673 150 112 150H80C62.3269 150 48 135.673 48 118V110Z" fill="white"/>
-  <path d="M72 116H120" stroke="#17314F" stroke-width="10" stroke-linecap="round"/>
-  <path d="M96 96V136" stroke="#2B8A88" stroke-width="10" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#17314f"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="52" fill="url(#bg)"/>
+  <path d="M49 118c0-22 16.1-38 38.5-38 6.2 0 12.1 1.2 17.4 3.7L119.5 62H142l-20.2 28.7c6.9 6.5 11.2 15.6 11.2 26.3 0 24.3-17.5 41.3-42.8 41.3S49 142.3 49 118Zm24.7 0c0 11.4 7.6 18.8 18.1 18.8s18.2-7.4 18.2-18.8-7.4-18.9-18.2-18.9S73.7 106.4 73.7 118Z" fill="#f8fafc"/>
+  <circle cx="138" cy="54" r="15" fill="#f59e0b"/>
 </svg>
