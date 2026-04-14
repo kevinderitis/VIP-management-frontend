@@ -101,7 +101,7 @@ export const AdminLayout = () => {
           </button>
         </aside>
         <main className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
-          <header className="sticky top-0 z-20 border-b border-white/60 bg-white/80 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur sm:px-6 sm:py-4 lg:px-8">
+          <header className="fixed inset-x-0 top-0 z-30 border-b border-white/60 bg-white/80 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur sm:px-6 sm:py-4 lg:sticky lg:z-20 lg:px-8">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <button
@@ -122,7 +122,7 @@ export const AdminLayout = () => {
               </div>
             </div>
           </header>
-          <div className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex-1 overflow-x-hidden px-4 pb-6 pt-[calc(env(safe-area-inset-top)+6.5rem)] sm:px-6 sm:pt-24 lg:px-8 lg:py-6">
             <Outlet />
           </div>
         </main>
