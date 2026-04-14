@@ -46,6 +46,7 @@ export const AdminAssignmentsPage = () => {
   const [search, setSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('')
   const [volunteerFilter, setVolunteerFilter] = useState('all')
+  const [taskTypeFilter, setTaskTypeFilter] = useState<'all' | 'manual' | 'recurring'>('all')
   const [page, setPage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
   const pageSize = 12
@@ -106,6 +107,7 @@ export const AdminAssignmentsPage = () => {
     const query = search.trim().toLowerCase()
 
     return assignmentRows.filter((row) => {
+      const matchesType = taskTypeFilter === 'all' || row.kind === taskTypeFilter
       const matchesVolunteer = volunteerFilter === 'all' || row.volunteerName === volunteerFilter
       const matchesDate = !dateFilter || row.dateValue === dateFilter
       const matchesQuery =
@@ -114,9 +116,9 @@ export const AdminAssignmentsPage = () => {
         row.detail.toLowerCase().includes(query) ||
         row.volunteerName.toLowerCase().includes(query)
 
-      return matchesVolunteer && matchesDate && matchesQuery
+      return matchesType && matchesVolunteer && matchesDate && matchesQuery
     })
-  }, [assignmentRows, dateFilter, search, volunteerFilter])
+  }, [assignmentRows, dateFilter, search, taskTypeFilter, volunteerFilter])
 
   const assignmentHistory = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -124,6 +126,13 @@ export const AdminAssignmentsPage = () => {
       if (!['task-taken', 'task-released', 'pack-assigned', 'routine-assigned'].includes(activity.type)) {
         return false
       }
+
+      const matchesType =
+        taskTypeFilter === 'all' ||
+        (taskTypeFilter === 'manual' &&
+          ['task-taken', 'task-released'].includes(activity.type)) ||
+        (taskTypeFilter === 'recurring' &&
+          ['pack-assigned', 'routine-assigned'].includes(activity.type))
 
       const activityDate = isoDate(activity.createdAt)
       const matchesVolunteer = volunteerFilter === 'all' || activity.description.includes(volunteerFilter)
@@ -133,17 +142,17 @@ export const AdminAssignmentsPage = () => {
         activity.title.toLowerCase().includes(query) ||
         activity.description.toLowerCase().includes(query)
 
-      return matchesVolunteer && matchesDate && matchesQuery
+      return matchesType && matchesVolunteer && matchesDate && matchesQuery
     })
-  }, [activities, dateFilter, search, volunteerFilter])
+  }, [activities, dateFilter, search, taskTypeFilter, volunteerFilter])
 
   useEffect(() => {
     setPage(1)
-  }, [dateFilter, search, volunteerFilter])
+  }, [dateFilter, search, taskTypeFilter, volunteerFilter])
 
   useEffect(() => {
     setHistoryPage(1)
-  }, [dateFilter, search, volunteerFilter])
+  }, [dateFilter, search, taskTypeFilter, volunteerFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize))
   const paginatedAssignments = filteredAssignments.slice((page - 1) * pageSize, page * pageSize)
@@ -163,7 +172,7 @@ export const AdminAssignmentsPage = () => {
       />
 
       <Panel className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_220px]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -172,6 +181,19 @@ export const AdminAssignmentsPage = () => {
               placeholder="Search by task, volunteer, or assignment"
               className="w-full rounded-2xl border-slate-200 pl-11"
             />
+          </label>
+
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Task type
+            <select
+              value={taskTypeFilter}
+              onChange={(event) => setTaskTypeFilter(event.target.value as 'all' | 'manual' | 'recurring')}
+              className="rounded-2xl border-slate-200"
+            >
+              <option value="all">All types</option>
+              <option value="manual">Common tasks</option>
+              <option value="recurring">Recurring assignments</option>
+            </select>
           </label>
 
           <label className="grid gap-2 text-sm font-medium text-ink">

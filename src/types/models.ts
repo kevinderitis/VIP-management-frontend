@@ -200,6 +200,17 @@ export interface Redemption {
   status: 'completed'
 }
 
+export interface OfficeCall {
+  id: string
+  volunteerId: string
+  callerAdminId: string
+  callerAdminName: string
+  message: string
+  status: 'active' | 'acknowledged'
+  createdAt: string
+  acknowledgedAt?: string
+}
+
 export interface ActivityItem {
   id: string
   type:
@@ -212,6 +223,7 @@ export interface ActivityItem {
     | 'pack-assigned'
     | 'routine-assigned'
     | 'volunteer-updated'
+    | 'office-called'
   title: string
   description: string
   createdAt: string

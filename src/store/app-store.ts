@@ -6,6 +6,7 @@ import {
   BulkBedTaskSelection,
   CleanerDraftInput,
   CleaningArea,
+  OfficeCall,
   CleaningPlaceStatus,
   CleaningPlaceStatusDraftInput,
   CleaningRoom,
@@ -42,6 +43,7 @@ type ServerState = {
   rewards: Reward[]
   redemptions: Redemption[]
   activities: ActivityItem[]
+  officeCalls: OfficeCall[]
 }
 
 type AppState = ServerState & {
@@ -116,6 +118,8 @@ type AppState = ServerState & {
     startTime: string,
     endTime: string,
   ) => Promise<void>
+  callVolunteersToOffice: (volunteerIds: string[]) => Promise<void>
+  acknowledgeOfficeCall: (callId: string) => Promise<void>
   runScheduler: () => Promise<void>
   dismissToast: (toastId: string) => void
 }
@@ -137,6 +141,7 @@ const emptyServerState: ServerState = {
   rewards: [],
   redemptions: [],
   activities: [],
+  officeCalls: [],
 }
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`
@@ -1064,6 +1069,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Recurring task assigned', 'The volunteer schedule now includes the selected recurring dates.'),
+    }))
+  },
+
+  callVolunteersToOffice: async (volunteerIds) => {
+    await apiRequest('/office-calls', {
+      method: 'POST',
+      token: get().accessToken,
+      body: { volunteerIds },
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(
+        state.toasts,
+        'Office call sent',
+        volunteerIds.length === 1
+          ? 'The volunteer received the office call.'
+          : 'The selected volunteers received the office call.',
+        'info',
+      ),
+    }))
+  },
+
+  acknowledgeOfficeCall: async (callId) => {
+    await apiRequest(`/office-calls/${callId}/acknowledge`, {
+      method: 'PATCH',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Office call acknowledged', 'The office notice was cleared.', 'info'),
     }))
   },
 

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { ToastViewport } from './components/common/ToastViewport'
+import { useOfficeCallNotifications } from './hooks/useOfficeCallNotifications'
 import { usePwaNotifications } from './hooks/usePwaNotifications'
 import { useRealtimeSimulation } from './hooks/useRealtimeSimulation'
 import { useTaskNotifications } from './hooks/useTaskNotifications'
@@ -13,6 +14,7 @@ function App() {
   useRealtimeSimulation()
   usePwaNotifications()
   useTaskNotifications()
+  useOfficeCallNotifications()
 
   useEffect(() => {
     void initializeApp()

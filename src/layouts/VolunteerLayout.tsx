@@ -15,6 +15,8 @@ const navItems = [
 export const VolunteerLayout = () => {
   const user = useSessionUser()
   const logout = useAppStore((state) => state.logout)
+  const officeCalls = useAppStore((state) => state.officeCalls)
+  const acknowledgeOfficeCall = useAppStore((state) => state.acknowledgeOfficeCall)
   const nextRewardGoal = Math.max(120, Math.ceil((user?.points ?? 0) / 50) * 50 + 50)
   const [isExpanded, setIsExpanded] = useState(true)
   const location = useLocation()
@@ -39,6 +41,8 @@ export const VolunteerLayout = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     setIsExpanded(true)
   }
+
+  const latestOfficeCall = officeCalls[0]
 
   return (
     <div className="min-h-screen bg-shell pb-24">
@@ -112,6 +116,24 @@ export const VolunteerLayout = () => {
             </div>
           </div>
         </header>
+        {latestOfficeCall ? (
+          <div className="mt-4 rounded-[28px] border border-rose-200 bg-rose-50 px-4 py-4 shadow-soft">
+            <p className="text-xs uppercase tracking-[0.24em] text-rose-500">Office call</p>
+            <p className="mt-2 font-display text-2xl font-semibold text-ink">
+              {latestOfficeCall.callerAdminName} is calling you to the office
+            </p>
+            <p className="mt-2 text-sm text-slate-600">{latestOfficeCall.message}</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => void acknowledgeOfficeCall(latestOfficeCall.id)}
+                className="rounded-2xl bg-ink px-4 py-2 text-sm font-semibold text-white shadow-float"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-6">
           <Outlet />
         </div>

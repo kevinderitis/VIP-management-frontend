@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, Coins, Medal, Plus, Search, Trash2, UserCog, UserRoundSearch } from 'lucide-react'
+import { BellRing, ChevronDown, Coins, Medal, Plus, Search, Trash2, UserCog, UserRoundSearch } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { VolunteerEditorModal } from '../../components/admin/VolunteerEditorModal'
 import { Button } from '../../components/common/Button'
@@ -17,11 +17,14 @@ export const AdminVolunteersPage = () => {
   const updateVolunteer = useAppStore((state) => state.updateVolunteer)
   const toggleVolunteer = useAppStore((state) => state.toggleVolunteer)
   const deleteVolunteer = useAppStore((state) => state.deleteVolunteer)
+  const callVolunteersToOffice = useAppStore((state) => state.callVolunteersToOffice)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedVolunteer, setSelectedVolunteer] = useState<User | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [openManageId, setOpenManageId] = useState<string | null>(null)
+  const [selectedVolunteerIds, setSelectedVolunteerIds] = useState<string[]>([])
+  const [mobileSelectionMode, setMobileSelectionMode] = useState(false)
 
   const filteredVolunteers = useMemo(
     () =>
@@ -35,6 +38,21 @@ export const AdminVolunteersPage = () => {
     [search, statusFilter, volunteers],
   )
 
+  const toggleSelection = (volunteerId: string) => {
+    setSelectedVolunteerIds((current) =>
+      current.includes(volunteerId)
+        ? current.filter((value) => value !== volunteerId)
+        : [...current, volunteerId],
+    )
+  }
+
+  const handleOfficeCall = async (volunteerIds: string[]) => {
+    if (!volunteerIds.length) return
+    await callVolunteersToOffice(volunteerIds)
+    setSelectedVolunteerIds((current) => current.filter((id) => !volunteerIds.includes(id)))
+    setMobileSelectionMode(false)
+  }
+
   return (
     <div className="grid gap-6">
       <SectionHeader
@@ -42,15 +60,42 @@ export const AdminVolunteersPage = () => {
         title="Volunteer management"
         description="Status, points, active tasks, and fast editing for the team."
         action={
-          <Button
-            onClick={() => {
-              setSelectedVolunteer(null)
-              setModalOpen(true)
-            }}
-          >
-            <Plus size={16} className="mr-2" />
-            Create volunteer
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              className="sm:hidden"
+              onClick={() => {
+                setMobileSelectionMode((current) => {
+                  const next = !current
+                  if (!next) {
+                    setSelectedVolunteerIds([])
+                  }
+                  return next
+                })
+              }}
+            >
+              <BellRing size={16} className="mr-2" />
+              {mobileSelectionMode ? 'Cancel call mode' : 'Call selected'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="hidden sm:inline-flex"
+              disabled={selectedVolunteerIds.length === 0}
+              onClick={() => void handleOfficeCall(selectedVolunteerIds)}
+            >
+              <BellRing size={16} className="mr-2" />
+              {selectedVolunteerIds.length > 0 ? `Call selected (${selectedVolunteerIds.length})` : 'Call selected'}
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedVolunteer(null)
+                setModalOpen(true)
+              }}
+            >
+              <Plus size={16} className="mr-2" />
+              Create volunteer
+            </Button>
+          </div>
         }
       />
       <Panel className="p-4">
@@ -75,12 +120,30 @@ export const AdminVolunteersPage = () => {
           </select>
         </div>
       </Panel>
-      <div className="grid gap-3">
+      <div className={`grid gap-3 ${mobileSelectionMode && selectedVolunteerIds.length > 0 ? 'pb-28 sm:pb-0' : ''}`}>
         {filteredVolunteers.length ? filteredVolunteers.map((volunteer) => (
           <Panel key={volunteer.id} className="overflow-hidden rounded-[24px]">
             <details className="group">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                 <div className="flex min-w-0 items-center gap-4">
+                  {mobileSelectionMode ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        toggleSelection(volunteer.id)
+                      }}
+                      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border sm:hidden ${
+                        selectedVolunteerIds.includes(volunteer.id)
+                          ? 'border-teal bg-teal text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                      aria-label={`Select ${volunteer.name}`}
+                    >
+                      {selectedVolunteerIds.includes(volunteer.id) ? '✓' : ''}
+                    </button>
+                  ) : null}
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-sm font-bold text-white">
                     {volunteer.avatar}
                   </div>
@@ -182,6 +245,17 @@ export const AdminVolunteersPage = () => {
                       ) : null}
                     </div>
                   </div>
+                  <div className="mt-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => void handleOfficeCall([volunteer.id])}
+                    >
+                      <BellRing size={15} className="mr-2" />
+                      Call to office
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="mt-4 hidden flex-wrap gap-2 sm:flex">
@@ -204,6 +278,10 @@ export const AdminVolunteersPage = () => {
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => toggleVolunteer(volunteer.id)}>
                     {volunteer.isActive ? 'Disable' : 'Enable'}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => void handleOfficeCall([volunteer.id])}>
+                    <BellRing size={15} className="mr-2" />
+                    Call to office
                   </Button>
                   <Button
                     variant="ghost"
@@ -241,6 +319,19 @@ export const AdminVolunteersPage = () => {
           createVolunteer(input)
         }}
       />
+
+      {mobileSelectionMode && selectedVolunteerIds.length > 0 ? (
+        <div className="fixed inset-x-4 bottom-4 z-30 sm:hidden">
+          <div className="rounded-[28px] border border-white/70 bg-white/95 p-3 shadow-soft backdrop-blur">
+            <Button className="w-full justify-center" onClick={() => void handleOfficeCall(selectedVolunteerIds)}>
+              <BellRing size={16} className="mr-2" />
+              {selectedVolunteerIds.length === 1
+                ? 'Call selected volunteer'
+                : `Call ${selectedVolunteerIds.length} volunteers`}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
