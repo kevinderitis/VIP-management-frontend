@@ -243,7 +243,7 @@ export const RoomStatusModal = ({
           )}
         </div>
 
-        <div className="order-1 flex min-h-0 flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:gap-4 lg:overflow-hidden">
+        <div className="order-1 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:min-h-0 lg:gap-4 lg:overflow-y-auto">
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -365,7 +365,7 @@ export const RoomStatusModal = ({
             </label>
           ) : null}
 
-          <div className="mt-auto flex gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0">
+          <div className="mt-1 flex gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0 lg:mt-auto">
             <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
               Cancel
             </Button>

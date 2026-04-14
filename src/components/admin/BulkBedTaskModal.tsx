@@ -224,7 +224,7 @@ export const BulkBedTaskModal = ({
           </div>
         </div>
 
-        <div className="order-1 flex min-h-0 flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:gap-4 lg:overflow-hidden">
+        <div className="order-1 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:min-h-0 lg:gap-4 lg:overflow-y-auto">
           <div className="flex items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4">
             <p className="text-sm text-slate-500">
               Select rooms, choose the exact beds, and optionally assign all resulting tasks to one volunteer.
@@ -319,7 +319,7 @@ export const BulkBedTaskModal = ({
             </div>
           </div>
 
-          <div className="mt-auto grid gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0">
+          <div className="mt-1 grid gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0 lg:mt-auto">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
