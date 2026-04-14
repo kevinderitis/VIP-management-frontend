@@ -27,7 +27,7 @@ export type Weekday =
 export type TaskAudience = 'volunteer' | 'cleaning'
 export type CleaningLocationType = 'room' | 'custom'
 export type RoomType = 'private' | 'shared'
-export type BedState = 'ready' | 'needs-making' | 'occupied'
+export type BedState = 'ready' | 'needs-making' | 'check' | 'occupied'
 
 export interface BedStatus {
   bedNumber: number
@@ -285,6 +285,15 @@ export interface CleaningPlaceStatusDraftInput {
   beds?: BedStatus[]
   assignCleanerId?: string
   assignVolunteerId?: string
+  applyVolunteerAssignment?: boolean
+}
+
+export interface BulkBedTaskSelection {
+  roomCode: string
+  roomSection: string
+  roomType: RoomType
+  placeLabel: string
+  bedNumbers: number[]
 }
 
 export interface RewardDraftInput {

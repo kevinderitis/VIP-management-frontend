@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { BedDouble, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserPlus } from 'lucide-react'
+import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
 import { CleaningTaskAssignmentModal } from '../../components/admin/CleaningTaskAssignmentModal'
@@ -12,12 +13,63 @@ import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
-import { CleaningArea, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
+import { CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 import { formatDateTime, formatTimeRange } from '../../utils/format'
 
 const sectionOrder = ['Arena Hostel', 'Arena Boutique / Seaview', 'Le Club']
 
 const fallbackStatus = { label: 'No status', color: '#cbd5e1', beds: [] }
+const activeTaskStatuses = ['assigned', 'available', 'scheduled']
+
+const normalizeLabel = (value?: string) => value?.trim().toLowerCase() ?? ''
+
+const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceStatus | undefined, relatedTasks: Task[]) => {
+  const activeTasks = relatedTasks.filter((task) => activeTaskStatuses.includes(task.status))
+  const activeBedTasks = activeTasks.filter((task) => task.bedTask)
+  const activeCleaningTask = activeTasks.find((task) => !task.bedTask)
+
+  const bedLabels = customStatus?.beds.map((bed) => normalizeLabel(bed.label)) ?? []
+  const roomServiceLabel = normalizeLabel(customStatus?.roomServiceLabel)
+
+  const hasOccupied = bedLabels.includes('occupied')
+  const hasNeedsMaking =
+    bedLabels.includes('needs making') ||
+    activeBedTasks.some((task) => normalizeLabel(task.title).includes('make bed'))
+  const hasCheck =
+    bedLabels.includes('check') ||
+    activeBedTasks.some((task) => normalizeLabel(task.title).includes('check bed'))
+  const hasNeedsCleaning =
+    roomServiceLabel === 'needs cleaning' ||
+    roomServiceLabel === 'need cleaning' ||
+    Boolean(activeCleaningTask)
+
+  const badges: Array<{ label: string; color: string }> = []
+
+  if (hasOccupied) {
+    badges.push({ label: 'Occupied', color: '#3b82f6' })
+  }
+  if (hasNeedsMaking) {
+    badges.push({ label: 'Needs making', color: '#ef4444' })
+  }
+  if (hasCheck) {
+    badges.push({ label: 'Check', color: '#f59e0b' })
+  }
+  if (hasNeedsCleaning) {
+    badges.push({ label: 'Needs cleaning', color: '#ef4444' })
+  }
+
+  if (!badges.length) {
+    badges.push({ label: 'Clean', color: '#22c55e' })
+  }
+
+  return {
+    color: badges[0].color,
+    primaryLabel: badges[0].label,
+    badges,
+    beds: customStatus?.beds ?? [],
+    roomType: customStatus?.roomType ?? room.roomType,
+  }
+}
 
 export const AdminCleaningTasksPage = () => {
   const tasks = useAppStore((state) => state.tasks)
@@ -36,6 +88,7 @@ export const AdminCleaningTasksPage = () => {
   const deleteCleaningArea = useAppStore((state) => state.deleteCleaningArea)
   const createCleaningRoom = useAppStore((state) => state.createCleaningRoom)
   const upsertCleaningPlaceStatus = useAppStore((state) => state.upsertCleaningPlaceStatus)
+  const bulkCreateBedTasks = useAppStore((state) => state.bulkCreateBedTasks)
   const cleaners = useCleanerUsers()
   const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
 
@@ -47,6 +100,7 @@ export const AdminCleaningTasksPage = () => {
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [areaOpen, setAreaOpen] = useState(false)
   const [roomCreateOpen, setRoomCreateOpen] = useState(false)
+  const [bulkBedOpen, setBulkBedOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [assignmentTask, setAssignmentTask] = useState<Task | null>(null)
   const [selectedArea, setSelectedArea] = useState<CleaningArea | null>(null)
@@ -112,13 +166,7 @@ export const AdminCleaningTasksPage = () => {
           const relatedTasks = tasks.filter(
             (task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === room.code,
           )
-          const derivedStatus =
-            customStatus ??
-            (relatedTasks.find((task) => task.bedTask && ['assigned', 'available', 'scheduled'].includes(task.status))
-              ? { label: 'Needs making', color: '#ef4444', beds: [], roomType: room.roomType }
-              : relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
-                ? { label: 'Needs cleaning', color: '#ef4444', beds: [], roomType: room.roomType }
-                : fallbackStatus)
+          const derivedStatus = deriveRoomBoardState(room, customStatus, relatedTasks)
 
           return { room, status: derivedStatus }
         }),
@@ -181,6 +229,10 @@ export const AdminCleaningTasksPage = () => {
         description="Manage cleaning work, grouped room boards, custom places, and bed-making requests for volunteers."
         action={
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setBulkBedOpen(true)}>
+              <BedDouble size={16} className="mr-2" />
+              Bulk bed tasks
+            </Button>
             <Button variant="secondary" onClick={() => setRoomCreateOpen(true)}>
               <BedDouble size={16} className="mr-2" />
               New room
@@ -235,9 +287,15 @@ export const AdminCleaningTasksPage = () => {
       </Panel>
 
       <Panel className="p-6">
-        <div className="flex items-center gap-2">
-          <Grid2X2 size={18} className="text-teal" />
-          <h3 className="section-title">Room board</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Grid2X2 size={18} className="text-teal" />
+            <h3 className="section-title">Room board</h3>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)}>
+            <BedDouble size={15} className="mr-2" />
+            Create bed tasks
+          </Button>
         </div>
         <p className="mt-2 text-sm text-slate-500">
           Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
@@ -315,7 +373,16 @@ export const AdminCleaningTasksPage = () => {
                       </div>
                       {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
                     </div>
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">{status.label}</p>
+                    <div className="mt-4 flex flex-wrap gap-1.5">
+                      {status.badges.map((badge) => (
+                        <span
+                          key={`${room.code}-${badge.label}`}
+                          className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white"
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -534,6 +601,22 @@ export const AdminCleaningTasksPage = () => {
           onSubmit={(input) => void upsertCleaningPlaceStatus(input)}
         />
       ) : null}
+
+      <BulkBedTaskModal
+        open={bulkBedOpen}
+        onClose={() => setBulkBedOpen(false)}
+        groups={groupedRooms.map((group) => ({
+          section: group.section,
+          rooms: group.rooms.map(({ room }) => ({
+            room,
+            status: cleaningPlaceStatuses.find(
+              (status) => status.placeType === 'room' && status.roomCode === room.code,
+            ),
+          })),
+        }))}
+        volunteers={volunteers}
+        onSubmit={(input) => void bulkCreateBedTasks(input)}
+      />
 
       <Modal
         open={roomCreateOpen}

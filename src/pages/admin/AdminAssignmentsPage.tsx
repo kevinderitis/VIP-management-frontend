@@ -1,10 +1,34 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound } from 'lucide-react'
 import { Button } from '../../components/common/Button'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore } from '../../store/app-store'
 import { formatDate, formatDateTime, formatTimeRange, formatWeekday } from '../../utils/format'
+
+type AssignmentRow = {
+  id: string
+  kind: 'manual' | 'recurring'
+  title: string
+  volunteerName: string
+  dateLabel: string
+  dateValue: string
+  statusLabel: string
+  detail: string
+  schedule: string
+  meta?: string
+  removeId?: string
+}
+
+const isoDate = (value?: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 export const AdminAssignmentsPage = () => {
   const tasks = useAppStore((state) => state.tasks)
@@ -13,86 +37,121 @@ export const AdminAssignmentsPage = () => {
   const routineAssignments = useAppStore((state) => state.routineAssignments)
   const activities = useAppStore((state) => state.activities)
   const deleteRoutineAssignment = useAppStore((state) => state.deleteRoutineAssignment)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const pageSize = 10
 
-  const assignedTasks = useMemo(
-    () =>
-      tasks.filter(
+  const volunteers = useMemo(
+    () => users.filter((user) => user.role === 'volunteer').sort((left, right) => left.name.localeCompare(right.name)),
+    [users],
+  )
+
+  const [search, setSearch] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
+  const [volunteerFilter, setVolunteerFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [historyPage, setHistoryPage] = useState(1)
+  const pageSize = 12
+  const historyPageSize = 8
+
+  const assignmentRows = useMemo<AssignmentRow[]>(() => {
+    const manualAssignments: AssignmentRow[] = tasks
+      .filter(
         (task) =>
           task.audience === 'volunteer' &&
           task.source === 'manual' &&
           ['assigned', 'scheduled'].includes(task.status),
-      ),
-    [tasks],
-  )
-
-  const filteredAssignedTasks = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return assignedTasks
-    return assignedTasks.filter(
-      (task) =>
-        task.title.toLowerCase().includes(query) ||
-        task.description.toLowerCase().includes(query),
-    )
-  }, [assignedTasks, search])
-
-  const recurringAssignments = useMemo(
-    () =>
-      routineAssignments.map((assignment) => {
-        const template = routineTasks.find((task) => task.id === assignment.templateId)
-        const volunteer = users.find((user) => user.id === assignment.volunteerId)
-        const generatedTasks = tasks.filter(
-          (task) => task.audience === 'volunteer' && task.routineAssignmentId === assignment.id,
-        )
-
+      )
+      .map((task) => {
+        const volunteer = users.find((user) => user.id === task.assignedTo)
+        const startsAt = task.scheduledAt ?? task.publishedAt
         return {
-          id: assignment.id,
-          name: template?.name ?? 'Recurring task',
-          volunteerName: volunteer?.name ?? 'Unknown volunteer',
-          startsOn: assignment.startsOn,
-          endsOn: assignment.endsOn,
-          weekdays: assignment.weekdays,
-          startTime: assignment.startTime,
-          endTime: assignment.endTime,
-          generatedTasks,
+          id: task.id,
+          kind: 'manual',
+          title: task.title,
+          volunteerName: volunteer?.name ?? 'Unassigned',
+          dateLabel: formatDateTime(startsAt),
+          dateValue: isoDate(startsAt),
+          statusLabel: task.status,
+          detail: task.description,
+          schedule: formatTimeRange(startsAt, task.endsAt),
+          meta: task.points ? `${task.points} pts` : undefined,
         }
-      }),
-    [routineAssignments, routineTasks, tasks, users],
-  )
+      })
 
-  const filteredRecurringAssignments = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return recurringAssignments
-    return recurringAssignments.filter(
-      (assignment) =>
-        assignment.name.toLowerCase().includes(query) ||
-        assignment.volunteerName.toLowerCase().includes(query),
+    const recurringAssignmentsRows: AssignmentRow[] = routineAssignments.map((assignment) => {
+      const template = routineTasks.find((task) => task.id === assignment.templateId)
+      const volunteer = users.find((user) => user.id === assignment.volunteerId)
+      const generatedTasks = tasks.filter(
+        (task) => task.audience === 'volunteer' && task.routineAssignmentId === assignment.id,
+      )
+      return {
+        id: assignment.id,
+        kind: 'recurring',
+        title: template?.name ?? 'Recurring task',
+        volunteerName: volunteer?.name ?? 'Unknown volunteer',
+        dateLabel: `${formatDate(assignment.startsOn)} to ${formatDate(assignment.endsOn)}`,
+        dateValue: isoDate(assignment.startsOn),
+        statusLabel: `${generatedTasks.length} slots`,
+        detail: `${assignment.weekdays.map(formatWeekday).join(', ')} · ${assignment.startTime} - ${assignment.endTime}`,
+        schedule: `${assignment.startTime} - ${assignment.endTime}`,
+        meta: `${generatedTasks.length} generated task${generatedTasks.length === 1 ? '' : 's'}`,
+        removeId: assignment.id,
+      }
+    })
+
+    return [...manualAssignments, ...recurringAssignmentsRows].sort((left, right) =>
+      right.dateValue.localeCompare(left.dateValue),
     )
-  }, [recurringAssignments, search])
+  }, [routineAssignments, routineTasks, tasks, users])
+
+  const filteredAssignments = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return assignmentRows.filter((row) => {
+      const matchesVolunteer = volunteerFilter === 'all' || row.volunteerName === volunteerFilter
+      const matchesDate = !dateFilter || row.dateValue === dateFilter
+      const matchesQuery =
+        !query ||
+        row.title.toLowerCase().includes(query) ||
+        row.detail.toLowerCase().includes(query) ||
+        row.volunteerName.toLowerCase().includes(query)
+
+      return matchesVolunteer && matchesDate && matchesQuery
+    })
+  }, [assignmentRows, dateFilter, search, volunteerFilter])
 
   const assignmentHistory = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const filtered = activities.filter((activity) => {
+    return activities.filter((activity) => {
       if (!['task-taken', 'task-released', 'pack-assigned', 'routine-assigned'].includes(activity.type)) {
         return false
       }
 
-      if (!query) return true
-      return (
+      const activityDate = isoDate(activity.createdAt)
+      const matchesVolunteer = volunteerFilter === 'all' || activity.description.includes(volunteerFilter)
+      const matchesDate = !dateFilter || activityDate === dateFilter
+      const matchesQuery =
+        !query ||
         activity.title.toLowerCase().includes(query) ||
         activity.description.toLowerCase().includes(query)
-      )
+
+      return matchesVolunteer && matchesDate && matchesQuery
     })
+  }, [activities, dateFilter, search, volunteerFilter])
 
-    return filtered
-  }, [activities, search])
+  useEffect(() => {
+    setPage(1)
+  }, [dateFilter, search, volunteerFilter])
 
-  const totalPages = Math.max(1, Math.ceil(assignmentHistory.length / pageSize))
-  const paginatedHistory = useMemo(
-    () => assignmentHistory.slice((page - 1) * pageSize, page * pageSize),
-    [assignmentHistory, page],
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [dateFilter, search, volunteerFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize))
+  const paginatedAssignments = filteredAssignments.slice((page - 1) * pageSize, page * pageSize)
+
+  const historyPages = Math.max(1, Math.ceil(assignmentHistory.length / historyPageSize))
+  const paginatedHistory = assignmentHistory.slice(
+    (historyPage - 1) * historyPageSize,
+    historyPage * historyPageSize,
   )
 
   return (
@@ -100,141 +159,143 @@ export const AdminAssignmentsPage = () => {
       <SectionHeader
         eyebrow="Assignments"
         title="Assignment control"
-        description="Track who is responsible for each individual task and each recurring assignment across the hostel."
+        description="Review who is handling each task right now, filter quickly, and keep recurring work under control."
       />
 
       <Panel className="p-4">
-        <label className="relative block">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value)
-              setPage(1)
-            }}
-            placeholder="Filter by task name, volunteer, or assignment event"
-            className="w-full rounded-2xl border-slate-200 pl-11"
-          />
-        </label>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
+          <label className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by task, volunteer, or assignment"
+              className="w-full rounded-2xl border-slate-200 pl-11"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Date
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              className="rounded-2xl border-slate-200"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Volunteer
+            <select
+              value={volunteerFilter}
+              onChange={(event) => setVolunteerFilter(event.target.value)}
+              className="rounded-2xl border-slate-200"
+            >
+              <option value="all">All volunteers</option>
+              {volunteers.map((volunteer) => (
+                <option key={volunteer.id} value={volunteer.name}>
+                  {volunteer.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel className="p-6">
+      <Panel className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <ClipboardList size={18} className="text-teal" />
-            <h3 className="section-title">Individual tasks</h3>
+            <h3 className="section-title">Current assignments</h3>
           </div>
-          <div className="mt-5 grid gap-3">
-            {filteredAssignedTasks.length ? (
-              filteredAssignedTasks.map((task) => {
-                const volunteer = users.find((user) => user.id === task.assignedTo)
-
-                return (
-                  <div key={task.id} className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-ink">{task.title}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {formatDateTime(task.scheduledAt ?? task.publishedAt)}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 capitalize">
-                        {task.status}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
-                      <span>{formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)}</span>
-                      <span>{task.points} pts</span>
-                      <span>{volunteer ? `Assigned to ${volunteer.name}` : 'Unassigned'}</span>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
-                There are no assigned individual tasks right now.
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel className="p-6">
-          <div className="flex items-center gap-2">
-            <Repeat2 size={18} className="text-teal" />
-            <h3 className="section-title">Recurring assignments</h3>
-          </div>
-          <div className="mt-5 grid gap-3">
-            {filteredRecurringAssignments.length ? (
-              filteredRecurringAssignments.map((assignment) => (
-                <details key={assignment.id} className="group rounded-2xl bg-slate-50 px-4 py-4">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-ink">{assignment.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">{assignment.volunteerName}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                        {assignment.generatedTasks.length} slot{assignment.generatedTasks.length > 1 ? 's' : ''}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(event) => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          if (!window.confirm(`Remove the recurring assignment "${assignment.name}" for ${assignment.volunteerName}?`)) return
-                          void deleteRoutineAssignment(assignment.id)
-                        }}
-                      >
-                        <Trash2 size={14} className="mr-2" />
-                        Remove
-                      </Button>
-                    </div>
-                  </summary>
-
-                  <div className="mt-4 grid gap-2 border-t border-slate-200 pt-4 text-sm text-slate-500">
-                    <p className="inline-flex items-center gap-2">
-                      <CalendarRange size={14} />
-                      {formatDate(assignment.startsOn)} to {formatDate(assignment.endsOn)}
-                    </p>
-                    <p>{assignment.weekdays.map(formatWeekday).join(', ')} · {assignment.startTime} - {assignment.endTime}</p>
-                    <div className="mt-2 grid gap-2">
-                      {assignment.generatedTasks.map((task) => (
-                        <div key={task.id} className="rounded-2xl bg-white px-3 py-3">
-                          <p className="font-medium text-ink">{formatDateTime(task.scheduledAt ?? task.publishedAt)}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)} · {task.status}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
-                There are no recurring assignments right now.
-              </div>
-            )}
-          </div>
-        </Panel>
-      </div>
-
-      <Panel className="bg-admin p-6 text-white">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <UserRound size={18} className="text-white" />
-              <h3 className="font-display text-2xl font-semibold">Assignment history</h3>
-            </div>
-            <p className="mt-3 text-sm text-white/75">
-              Review task claims, releases, and generated assignment events without overloading the screen.
-            </p>
-          </div>
-          <div className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
-            Page {page} of {totalPages}
+          <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
+            {filteredAssignments.length} result{filteredAssignments.length === 1 ? '' : 's'} · Page {page} of {totalPages}
           </div>
         </div>
+
+        <div className="mt-5 grid gap-3">
+          {paginatedAssignments.length ? (
+            paginatedAssignments.map((row) => (
+              <div key={`${row.kind}-${row.id}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          row.kind === 'manual' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {row.kind === 'manual' ? 'Manual task' : 'Recurring assignment'}
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                        {row.statusLabel}
+                      </span>
+                    </div>
+                    <p className="mt-3 font-display text-xl font-semibold text-ink">{row.title}</p>
+                    <p className="mt-2 text-sm text-slate-500">{row.detail}</p>
+                  </div>
+
+                  {row.removeId ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const removeId = row.removeId
+                        if (!removeId) return
+                        if (!window.confirm(`Remove "${row.title}" from ${row.volunteerName}?`)) return
+                        void deleteRoutineAssignment(removeId)
+                      }}
+                    >
+                      <Trash2 size={14} className="mr-2" />
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm text-slate-500 md:grid-cols-2 xl:grid-cols-4">
+                  <p className="inline-flex items-center gap-2">
+                    <UserRound size={14} />
+                    {row.volunteerName}
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <CalendarRange size={14} />
+                    {row.dateLabel}
+                  </p>
+                  <p>{row.schedule}</p>
+                  {row.meta ? <p>{row.meta}</p> : <p>Operational view</p>}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+              No assignments match these filters.
+            </div>
+          )}
+        </div>
+
+        {totalPages > 1 ? (
+          <div className="mt-5 flex justify-end gap-2">
+            <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+              Previous
+            </Button>
+            <Button size="sm" variant="secondary" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+              Next
+            </Button>
+          </div>
+        ) : null}
+      </Panel>
+
+      <Panel className="bg-admin p-6 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Repeat2 size={18} className="text-white" />
+            <h3 className="font-display text-2xl font-semibold">Assignment history</h3>
+          </div>
+          <div className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80">
+            Page {historyPage} of {historyPages}
+          </div>
+        </div>
+
         <div className="mt-5 grid gap-3">
           {paginatedHistory.length ? (
             paginatedHistory.map((activity) => (
@@ -250,28 +311,19 @@ export const AdminAssignmentsPage = () => {
             ))
           ) : (
             <div className="rounded-2xl border border-white/15 px-4 py-5 text-sm text-white/70">
-              No assignment history matches this filter.
+              No assignment history matches these filters.
             </div>
           )}
         </div>
-        {totalPages > 1 ? (
+
+        {historyPages > 1 ? (
           <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={page === 1}
-              className="rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 disabled:opacity-40"
-            >
+            <Button size="sm" variant="secondary" disabled={historyPage === 1} onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}>
               Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-              disabled={page === totalPages}
-              className="rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 disabled:opacity-40"
-            >
+            </Button>
+            <Button size="sm" variant="secondary" disabled={historyPage === historyPages} onClick={() => setHistoryPage((current) => Math.min(historyPages, current + 1))}>
               Next
-            </button>
+            </Button>
           </div>
         ) : null}
       </Panel>

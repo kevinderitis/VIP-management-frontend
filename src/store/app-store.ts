@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { apiRequest } from '../lib/api'
 import {
   ActivityItem,
+  BulkBedTaskSelection,
   CleanerDraftInput,
   CleaningArea,
   CleaningPlaceStatus,
@@ -76,6 +77,12 @@ type AppState = ServerState & {
   deleteCleaningArea: (areaId: string) => Promise<void>
   createCleaningRoom: (input: { code: string; section: string; roomType: 'private' | 'shared'; bedCount: number }) => Promise<void>
   upsertCleaningPlaceStatus: (input: CleaningPlaceStatusDraftInput) => Promise<void>
+  bulkCreateBedTasks: (input: {
+    selections: BulkBedTaskSelection[]
+    assignVolunteerId?: string
+    label: string
+    color: string
+  }) => Promise<void>
   createCleaningTask: (input: CleaningTaskDraftInput) => Promise<void>
   updateCleaningTask: (taskId: string, input: CleaningTaskDraftInput) => Promise<void>
   publishCleaningTask: (taskId: string) => Promise<void>
@@ -246,6 +253,7 @@ const mapCleaningPlaceStatusInput = (input: CleaningPlaceStatusDraftInput) => ({
   })),
   assignCleanerId: input.assignCleanerId || undefined,
   assignVolunteerId: input.assignVolunteerId || undefined,
+  applyVolunteerAssignment: input.applyVolunteerAssignment || undefined,
 })
 
 const mapGroupInput = (input: TaskGroupDraftInput) => ({
@@ -674,6 +682,46 @@ export const useAppStore = create<AppState>((set, get) => ({
           state.toasts,
           'Could not update place status',
           error instanceof Error ? error.message : 'The room board update failed.',
+          'warning',
+        ),
+      }))
+    }
+  },
+
+  bulkCreateBedTasks: async (input) => {
+    try {
+      await apiRequest('/cleaning-place-statuses/bulk-bed-tasks', {
+        method: 'POST',
+        token: get().accessToken,
+        body: {
+          selections: input.selections.map((selection) => ({
+            roomCode: selection.roomCode,
+            roomSection: selection.roomSection,
+            roomType: toApiEnum(selection.roomType),
+            placeLabel: selection.placeLabel,
+            bedNumbers: selection.bedNumbers,
+          })),
+          assignVolunteerId: input.assignVolunteerId || undefined,
+          label: input.label,
+          color: input.color,
+        },
+      })
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Bed tasks created',
+          input.assignVolunteerId
+            ? 'The selected beds were assigned and split into individual volunteer tasks.'
+            : 'The selected beds are now available as individual volunteer tasks.',
+        ),
+      }))
+    } catch (error) {
+      set((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Could not create bed tasks',
+          error instanceof Error ? error.message : 'The room board action failed.',
           'warning',
         ),
       }))
