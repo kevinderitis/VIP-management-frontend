@@ -40,11 +40,11 @@ export const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.12),_transparent_28%),linear-gradient(180deg,_#f8fbfc_0%,_#edf4f7_100%)] px-4 py-5 sm:py-8 lg:px-6 lg:py-10">
-      <div className="mx-auto grid min-h-[calc(100vh-2.5rem)] w-full max-w-[1240px] items-stretch gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,520px)]">
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.12),_transparent_28%),linear-gradient(180deg,_#f8fbfc_0%,_#edf4f7_100%)] px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-[calc(env(safe-area-inset-top)+1.25rem)] sm:py-8 lg:px-6 lg:py-10">
+      <div className="mx-auto grid min-h-[calc(100dvh-2.5rem)] w-full max-w-[1240px] items-stretch gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,520px)]">
         <section className="relative hidden overflow-hidden rounded-[38px] bg-admin px-7 py-8 text-white shadow-soft sm:px-10 sm:py-10 lg:block">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(45,212,191,0.18),_transparent_26%)]" />
-          <div className="relative">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(45,212,191,0.18),_transparent_26%)]" />
+          <div className="relative z-10">
             <p className="text-xs uppercase tracking-[0.34em] text-white/60">VolunteerFlow Hostel</p>
             <h1 className="mt-5 max-w-xl font-display text-4xl font-semibold leading-tight sm:text-5xl">
               Sign in to your hostel workspace.
@@ -80,8 +80,8 @@ export const LoginPage = () => {
           </div>
         </section>
 
-        <section className="flex items-center justify-center">
-          <div className="w-full rounded-[32px] border border-white/70 bg-white/92 p-6 shadow-soft backdrop-blur sm:p-8 lg:rounded-[38px] lg:p-8">
+        <section className="relative z-10 flex items-center justify-center">
+          <div className="relative z-10 w-full rounded-[32px] border border-white/70 bg-white/92 p-6 shadow-soft backdrop-blur sm:p-8 lg:rounded-[38px] lg:p-8">
             <div className="mx-auto max-w-md">
               <p className="text-xs uppercase tracking-[0.28em] text-teal">Secure access</p>
               <h2 className="mt-3 font-display text-3xl font-semibold text-ink sm:text-4xl">
@@ -132,12 +132,17 @@ export const LoginPage = () => {
                 </div>
               ) : null}
 
-              <form onSubmit={handleSubmit} className="mt-8 grid gap-4">
+              <form onSubmit={handleSubmit} className="relative z-10 mt-8 grid gap-4">
                 <label className="grid gap-2 text-sm font-medium text-ink">
                   Username
                   <div className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <UserRound size={18} className="text-slate-400" />
                     <input
+                      name="username"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       value={identifier}
                       onChange={(event) => setIdentifier(event.target.value)}
@@ -152,6 +157,11 @@ export const LoginPage = () => {
                   <div className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <KeyRound size={18} className="text-slate-400" />
                     <input
+                      name="password"
+                      autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       type="password"
                       value={password}

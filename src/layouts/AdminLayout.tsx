@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarRange, ClipboardList, Gift, LayoutDashboard, LogOut, Menu, Repeat2, Sparkles, Users2, X } from 'lucide-react'
+import { CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Gift, LayoutDashboard, LogOut, Menu, Repeat2, Sparkles, Users2, X } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAppStore, useSessionUser } from '../store/app-store'
 import { cn } from '../utils/cn'
@@ -19,18 +19,52 @@ export const AdminLayout = () => {
   const user = useSessionUser()
   const logout = useAppStore((state) => state.logout)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
     <div className="min-h-screen bg-shell">
-      <div className="mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden h-screen self-start overflow-y-auto border-r border-white/60 bg-admin px-6 py-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col">
-          <div className="rounded-[28px] border border-white/10 bg-white/8 p-6 backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
-            <h1 className="mt-3 font-display text-3xl font-semibold">Hostel Control Hub</h1>
-            <p className="mt-3 text-sm text-white/70">
-              Operations, volunteers, assignments, and rewards in one live workspace.
-            </p>
+      <div
+        className={cn(
+          'mx-auto grid min-h-screen max-w-[1600px]',
+          sidebarCollapsed ? 'lg:grid-cols-[96px_minmax(0,1fr)]' : 'lg:grid-cols-[280px_minmax(0,1fr)]',
+        )}
+      >
+        <aside
+          className={cn(
+            'hidden h-screen self-start overflow-y-auto border-r border-white/60 bg-admin py-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col',
+            sidebarCollapsed ? 'px-3' : 'px-6',
+          )}
+        >
+          <div className={cn('flex items-start', sidebarCollapsed ? 'justify-center' : 'justify-end')}>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-white/80 transition hover:bg-white/12"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </button>
           </div>
+
+          <div className={cn('mt-4 rounded-[28px] border border-white/10 bg-white/8 backdrop-blur', sidebarCollapsed ? 'p-3' : 'p-6')}>
+            {sidebarCollapsed ? (
+              <div className="flex justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-bold text-ink">
+                  VF
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
+                <h1 className="mt-3 font-display text-3xl font-semibold">Hostel Control Hub</h1>
+                <p className="mt-3 text-sm text-white/70">
+                  Operations, volunteers, assignments, and rewards in one live workspace.
+                </p>
+              </>
+            )}
+          </div>
+
           <nav className="mt-8 grid gap-2">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -41,23 +75,29 @@ export const AdminLayout = () => {
                   end={item.to === '/admin'}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/70 transition',
+                      'flex items-center rounded-2xl py-3 text-sm font-medium text-white/70 transition',
+                      sidebarCollapsed ? 'justify-center px-3' : 'gap-3 px-4',
                       isActive ? 'bg-white text-ink shadow-soft' : 'hover:bg-white/10 hover:text-white',
                     )
                   }
+                  title={sidebarCollapsed ? item.label : undefined}
                 >
                   <Icon size={18} />
-                  {item.label}
+                  {sidebarCollapsed ? null : item.label}
                 </NavLink>
               )
             })}
           </nav>
           <button
             onClick={logout}
-            className="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-white/80 hover:bg-white/10"
+            className={cn(
+              'mt-auto flex items-center rounded-2xl border border-white/10 py-3 text-sm text-white/80 hover:bg-white/10',
+              sidebarCollapsed ? 'justify-center px-3' : 'gap-3 px-4',
+            )}
+            title={sidebarCollapsed ? 'Sign out' : undefined}
           >
             <LogOut size={18} />
-            Sign out
+            {sidebarCollapsed ? null : 'Sign out'}
           </button>
         </aside>
         <main className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
