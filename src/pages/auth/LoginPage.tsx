@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { Button } from '../../components/common/Button'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
 import { useAppStore, useSessionUser } from '../../store/app-store'
+import { cn } from '../../utils/cn'
 import { roleHomePath } from '../../utils/constants'
 
 export const LoginPage = () => {
@@ -15,6 +16,7 @@ export const LoginPage = () => {
   const [error, setError] = useState('')
   const [installMessage, setInstallMessage] = useState('')
   const pwaInstall = usePwaInstallPrompt()
+  const isStandaloneMobile = pwaInstall.isInstalled && pwaInstall.isMobile
 
   if (sessionUser) {
     return <Navigate to={roleHomePath[sessionUser.role]} replace />
@@ -81,7 +83,12 @@ export const LoginPage = () => {
         </section>
 
         <section className="relative z-10 flex items-center justify-center">
-          <div className="relative z-10 w-full rounded-[32px] border border-white/70 bg-white/92 p-6 shadow-soft backdrop-blur sm:p-8 lg:rounded-[38px] lg:p-8">
+          <div
+            className={cn(
+              'relative z-10 w-full rounded-[32px] border border-white/70 p-6 shadow-soft sm:p-8 lg:rounded-[38px] lg:p-8',
+              isStandaloneMobile ? 'bg-white shadow-none backdrop-blur-none' : 'bg-white/92 backdrop-blur',
+            )}
+          >
             <div className="mx-auto max-w-md">
               <p className="text-xs uppercase tracking-[0.28em] text-teal">Secure access</p>
               <h2 className="mt-3 font-display text-3xl font-semibold text-ink sm:text-4xl">
@@ -132,10 +139,10 @@ export const LoginPage = () => {
                 </div>
               ) : null}
 
-              <form onSubmit={handleSubmit} className="relative z-10 mt-8 grid gap-4">
+              <form onSubmit={handleSubmit} className="relative z-10 mt-8 grid gap-4 touch-manipulation">
                 <label className="grid gap-2 text-sm font-medium text-ink">
                   Username
-                  <div className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <div className="pointer-events-auto flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <UserRound size={18} className="text-slate-400" />
                     <input
                       name="username"
@@ -148,13 +155,14 @@ export const LoginPage = () => {
                       onChange={(event) => setIdentifier(event.target.value)}
                       placeholder="Enter your username"
                       className="w-full border-0 bg-transparent p-0 text-base text-ink placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                      style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
                     />
                   </div>
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium text-ink">
                   Password
-                  <div className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <div className="pointer-events-auto flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
                     <KeyRound size={18} className="text-slate-400" />
                     <input
                       name="password"
@@ -168,6 +176,7 @@ export const LoginPage = () => {
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="Enter your password"
                       className="w-full border-0 bg-transparent p-0 text-base text-ink placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                      style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
                     />
                   </div>
                 </label>
