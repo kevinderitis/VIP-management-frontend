@@ -146,7 +146,7 @@ export const RoomStatusModal = ({
       open={open}
       onClose={onClose}
       title={room.label}
-      panelClassName="max-w-4xl"
+      panelClassName="h-[100dvh] max-h-[100dvh] max-w-4xl rounded-none p-4 sm:max-h-[90vh] sm:rounded-[28px] sm:p-6"
       bodyClassName="mt-4 overflow-hidden"
       description={
         roomType === 'shared'
@@ -154,8 +154,8 @@ export const RoomStatusModal = ({
           : 'Private rooms keep the room status plus an optional volunteer task for making or checking the bed.'
       }
     >
-      <form onSubmit={handleSubmit} className="grid h-[74vh] min-h-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-h-0 overflow-y-auto pr-1">
+      <form onSubmit={handleSubmit} className="grid h-full min-h-0 gap-4 grid-rows-[auto_minmax(0,1fr)] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
+        <div className="order-2 min-h-0 overflow-y-auto pr-1 lg:order-1">
           {roomType === 'private' ? (
             <div className="rounded-[24px] bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -243,7 +243,7 @@ export const RoomStatusModal = ({
           )}
         </div>
 
-        <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+        <div className="order-1 flex min-h-0 flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:gap-4 lg:overflow-hidden">
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -365,7 +365,7 @@ export const RoomStatusModal = ({
             </label>
           ) : null}
 
-          <div className="sticky bottom-0 mt-auto flex gap-3 border-t border-slate-200 bg-slate-50 pt-3">
+          <div className="mt-auto flex gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0">
             <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
               Cancel
             </Button>

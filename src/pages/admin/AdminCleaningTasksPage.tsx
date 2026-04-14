@@ -231,7 +231,7 @@ export const AdminCleaningTasksPage = () => {
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setBulkBedOpen(true)}>
               <BedDouble size={16} className="mr-2" />
-              Bulk bed tasks
+              Bulk bed
             </Button>
             <Button variant="secondary" onClick={() => setRoomCreateOpen(true)}>
               <BedDouble size={16} className="mr-2" />
@@ -294,7 +294,7 @@ export const AdminCleaningTasksPage = () => {
           </div>
           <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)}>
             <BedDouble size={15} className="mr-2" />
-            Create bed tasks
+            Bulk bed
           </Button>
         </div>
         <p className="mt-2 text-sm text-slate-500">

@@ -138,11 +138,11 @@ export const BulkBedTaskModal = ({
       onClose={onClose}
       title="Create bed tasks in bulk"
       description="Select rooms, choose the exact beds, and optionally assign all resulting tasks to one volunteer."
-      panelClassName="max-w-6xl"
+      panelClassName="h-[100dvh] max-h-[100dvh] max-w-6xl rounded-none p-4 sm:max-h-[90vh] sm:rounded-[28px] sm:p-6"
       bodyClassName="mt-4 min-h-0 overflow-hidden"
     >
-      <div className="grid h-[74vh] min-h-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-h-0 overflow-y-auto pr-1">
+      <div className="grid h-full min-h-0 gap-4 grid-rows-[auto_minmax(0,1fr)] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
+        <div className="order-2 min-h-0 overflow-y-auto pr-1 lg:order-1">
           <div className="space-y-5">
             {groups.map((group) => (
               <div key={group.section} className="grid gap-3">
@@ -224,19 +224,41 @@ export const BulkBedTaskModal = ({
           </div>
         </div>
 
-        <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+        <div className="order-1 flex min-h-0 flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:gap-4 lg:overflow-hidden">
           <div className="flex items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4">
             <p className="text-sm text-slate-500">
               Select rooms, choose the exact beds, and optionally assign all resulting tasks to one volunteer.
             </p>
-            <Button type="button" size="sm" variant="ghost" onClick={clearSelection} className="shrink-0">
+            <Button type="button" size="sm" variant="ghost" onClick={clearSelection} className="hidden shrink-0 sm:inline-flex">
               Clear selection
             </Button>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <p className="text-sm font-medium text-ink">Task type</p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-3 grid gap-2 sm:hidden">
+              <select
+                value={requestLabel}
+                onChange={(event) => {
+                  const selectedPreset = requestPresets.find((preset) => preset.label === event.target.value)
+                  if (!selectedPreset) return
+                  setRequestLabel(selectedPreset.label)
+                  setRequestColor(selectedPreset.color)
+                }}
+                className="rounded-2xl border-slate-200"
+              >
+                {requestPresets.map((preset) => (
+                  <option key={preset.label} value={preset.label}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-4 py-2 text-sm font-semibold text-ink">
+                <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: requestColor }} />
+                {requestLabel}
+              </div>
+            </div>
+            <div className="mt-3 hidden gap-2 sm:grid">
               {requestPresets.map((preset) => (
                 <button
                   key={preset.label}
@@ -297,7 +319,7 @@ export const BulkBedTaskModal = ({
             </div>
           </div>
 
-          <div className="sticky bottom-0 mt-auto grid gap-3 border-t border-slate-200 bg-slate-50 pt-3">
+          <div className="mt-auto grid gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
