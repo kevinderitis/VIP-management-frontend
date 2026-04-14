@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Coins, Gift, Home, LogOut, Medal, ClipboardCheck, Trophy } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAppStore, useSessionUser } from '../store/app-store'
 import { ProgressBar } from '../components/common/ProgressBar'
 
@@ -17,6 +17,7 @@ export const VolunteerLayout = () => {
   const logout = useAppStore((state) => state.logout)
   const nextRewardGoal = Math.max(120, Math.ceil((user?.points ?? 0) / 50) * 50 + 50)
   const [isExpanded, setIsExpanded] = useState(true)
+  const location = useLocation()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,6 +30,10 @@ export const VolunteerLayout = () => {
 
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   const revealPointsCard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
