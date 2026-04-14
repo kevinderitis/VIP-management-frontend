@@ -229,7 +229,7 @@ export const AdminCleaningTasksPage = () => {
         description="Manage cleaning work, grouped room boards, custom places, and bed-making requests for volunteers."
         action={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setBulkBedOpen(true)}>
+            <Button variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap px-4 sm:px-5">
               <BedDouble size={16} className="mr-2" />
               Bulk bed
             </Button>
@@ -292,7 +292,7 @@ export const AdminCleaningTasksPage = () => {
             <Grid2X2 size={18} className="text-teal" />
             <h3 className="section-title">Room board</h3>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)}>
+          <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap">
             <BedDouble size={15} className="mr-2" />
             Bulk bed
           </Button>
