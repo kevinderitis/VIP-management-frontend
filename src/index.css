@@ -18,12 +18,14 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  touch-action: manipulation;
   background:
     radial-gradient(circle at top left, rgba(127, 209, 204, 0.26), transparent 30%),
     radial-gradient(circle at top right, rgba(244, 184, 95, 0.15), transparent 24%),
@@ -40,6 +42,14 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+@media (max-width: 1024px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 ::-webkit-scrollbar {
