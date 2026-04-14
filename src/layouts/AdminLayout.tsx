@@ -23,7 +23,7 @@ export const AdminLayout = () => {
   return (
     <div className="min-h-screen bg-shell">
       <div className="mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden h-screen overflow-y-auto border-r border-white/60 bg-admin px-6 py-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col">
+        <aside className="hidden h-screen self-start overflow-y-auto border-r border-white/60 bg-admin px-6 py-8 text-white lg:sticky lg:top-0 lg:flex lg:flex-col">
           <div className="rounded-[28px] border border-white/10 bg-white/8 p-6 backdrop-blur">
             <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
             <h1 className="mt-3 font-display text-3xl font-semibold">Hostel Control Hub</h1>
@@ -60,8 +60,8 @@ export const AdminLayout = () => {
             Sign out
           </button>
         </aside>
-        <main className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/60 bg-white/80 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+        <main className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
+          <header className="sticky top-0 z-20 border-b border-white/60 bg-white/80 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur sm:px-6 sm:py-4 lg:px-8">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <button
@@ -80,16 +80,9 @@ export const AdminLayout = () => {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Workspace</p>
                 <p className="mt-1 font-semibold text-ink">Connected and running live</p>
               </div>
-              <button
-                type="button"
-                onClick={logout}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-ink shadow-soft lg:hidden"
-              >
-                <LogOut size={18} />
-              </button>
             </div>
           </header>
-          <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
             <Outlet />
           </div>
         </main>

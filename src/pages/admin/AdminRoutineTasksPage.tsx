@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarRange, History, Pencil, Plus, Repeat2, Search, SendToBack, Trash2, UserRound } from 'lucide-react'
+import { CalendarRange, History, Pencil, Plus, Repeat2, Search, SendToBack, Trash2, UserCog, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { RoutineAssignmentModal } from '../../components/admin/RoutineAssignmentModal'
 import { RoutineTaskEditorModal } from '../../components/admin/RoutineTaskEditorModal'
@@ -26,6 +26,7 @@ export const AdminRoutineTasksPage = () => {
   const [editorOpen, setEditorOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [selectedRoutineTask, setSelectedRoutineTask] = useState<RoutineTaskTemplate | null>(null)
+  const [openManageId, setOpenManageId] = useState<string | null>(null)
 
   const filteredTasks = useMemo(
     () =>
@@ -177,7 +178,63 @@ export const AdminRoutineTasksPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 xl:w-[240px] xl:flex-col">
+                  <div className="sm:hidden">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setSelectedRoutineTask(task)
+                          setAssignOpen(true)
+                        }}
+                      >
+                        <SendToBack size={15} className="mr-2" />
+                        Assign
+                      </Button>
+                      <div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => setOpenManageId(openManageId === task.id ? null : task.id)}
+                        >
+                          <UserCog size={15} className="mr-2" />
+                          Manage
+                        </Button>
+                        {openManageId === task.id ? (
+                          <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                            <Button
+                              variant="secondary"
+                              className="w-full"
+                              onClick={() => {
+                                setSelectedRoutineTask(task)
+                                setEditorOpen(true)
+                              }}
+                            >
+                              <Pencil size={15} className="mr-2" />
+                              Edit
+                            </Button>
+                            <Button variant="ghost" className="w-full" onClick={() => toggleRoutineTask(task.id)}>
+                              <UserRound size={15} className="mr-2" />
+                              {task.isActive ? 'Disable' : 'Enable'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="w-full"
+                              onClick={() => {
+                                if (!window.confirm(`Delete "${task.name}" permanently?`)) return
+                                void deleteRoutineTask(task.id)
+                              }}
+                            >
+                              <Trash2 size={15} className="mr-2" />
+                              Delete
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="hidden flex-wrap gap-2 xl:w-[240px] xl:flex-col sm:flex">
                     <Button
                       variant="secondary"
                       onClick={() => {

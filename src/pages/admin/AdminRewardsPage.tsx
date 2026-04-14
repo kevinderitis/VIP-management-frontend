@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Gift, Plus, Trash2 } from 'lucide-react'
+import { Gift, Plus, Trash2, UserCog } from 'lucide-react'
 import { RewardEditorModal } from '../../components/admin/RewardEditorModal'
 import { Button } from '../../components/common/Button'
 import { Panel } from '../../components/common/Panel'
@@ -18,6 +18,7 @@ export const AdminRewardsPage = () => {
   const deleteReward = useAppStore((state) => state.deleteReward)
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [openManageId, setOpenManageId] = useState<string | null>(null)
 
   return (
     <div className="grid gap-6">
@@ -62,7 +63,49 @@ export const AdminRewardsPage = () => {
                     {reward.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 sm:hidden">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setOpenManageId(openManageId === reward.id ? null : reward.id)}
+                  >
+                    <UserCog size={15} className="mr-2" />
+                    Manage
+                  </Button>
+                  {openManageId === reward.id ? (
+                    <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setSelectedReward(reward)
+                          setModalOpen(true)
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleReward(reward.id)}>
+                        {reward.isActive ? 'Disable' : 'Enable'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          if (!window.confirm(`Delete "${reward.name}" permanently?`)) return
+                          void deleteReward(reward.id)
+                        }}
+                      >
+                        <Trash2 size={15} className="mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-4 hidden gap-2 sm:flex">
                   <Button
                     variant="secondary"
                     size="sm"

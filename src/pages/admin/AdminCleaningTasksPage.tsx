@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { BedDouble, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserPlus } from 'lucide-react'
+import { BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
@@ -108,6 +108,10 @@ export const AdminCleaningTasksPage = () => {
   const [roomModalOpen, setRoomModalOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState<CleaningRoom | null>(null)
   const [selectedPlace, setSelectedPlace] = useState<Omit<CleaningPlaceStatusDraftInput, 'label' | 'color'> | null>(null)
+  const [openAreaManageId, setOpenAreaManageId] = useState<string | null>(null)
+  const [openTaskManageId, setOpenTaskManageId] = useState<string | null>(null)
+  const [roomBoardOpen, setRoomBoardOpen] = useState(true)
+  const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
   const [newRoom, setNewRoom] = useState<{
     code: string
     section: string
@@ -222,18 +226,18 @@ export const AdminCleaningTasksPage = () => {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6 overflow-x-hidden">
       <SectionHeader
         eyebrow="Cleaning ops"
         title="Cleaning service tasks"
         description="Manage cleaning work, grouped room boards, custom places, and bed-making requests for volunteers."
         action={
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap px-4 sm:px-5">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <Button variant="secondary" onClick={() => setBulkBedOpen(true)} className="min-w-0 px-4 sm:px-5">
               <BedDouble size={16} className="mr-2" />
               Bulk bed
             </Button>
-            <Button variant="secondary" onClick={() => setRoomCreateOpen(true)}>
+            <Button variant="secondary" onClick={() => setRoomCreateOpen(true)} className="min-w-0">
               <BedDouble size={16} className="mr-2" />
               New room
             </Button>
@@ -243,6 +247,7 @@ export const AdminCleaningTasksPage = () => {
                 setSelectedArea(null)
                 setAreaOpen(true)
               }}
+              className="min-w-0"
             >
               <MapPin size={16} className="mr-2" />
               New location
@@ -252,9 +257,11 @@ export const AdminCleaningTasksPage = () => {
                 setSelectedTask(null)
                 setModalOpen(true)
               }}
+              className="min-w-0 px-4 sm:px-5"
             >
               <Plus size={16} className="mr-2" />
-              Create cleaning task
+              <span className="sm:hidden">Create task</span>
+              <span className="hidden sm:inline">Create cleaning task</span>
             </Button>
           </div>
         }
@@ -286,23 +293,56 @@ export const AdminCleaningTasksPage = () => {
         </div>
       </Panel>
 
-      <Panel className="p-6">
+      <Panel className="overflow-hidden p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRoomBoardOpen((current) => !current)}
+            className="flex items-center gap-2 text-left"
+          >
             <Grid2X2 size={18} className="text-teal" />
             <h3 className="section-title">Room board</h3>
-          </div>
+            <span className={`rounded-2xl bg-slate-100 p-2 text-slate-500 transition ${roomBoardOpen ? 'rotate-180' : ''}`}>
+              <ChevronDown size={16} />
+            </span>
+          </button>
           <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap">
             <BedDouble size={15} className="mr-2" />
             Bulk bed
           </Button>
         </div>
-        <p className="mt-2 text-sm text-slate-500">
-          Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
-        </p>
+        {roomBoardOpen ? (
+          <>
+            <p className="mt-2 text-sm text-slate-500">
+              Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
+            </p>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[auto_auto] lg:items-start lg:justify-between">
-          <div className="flex flex-wrap gap-2">
+            <div className="mt-5 grid gap-4 lg:grid-cols-[auto_auto] lg:items-start lg:justify-between">
+          <div className="grid gap-3 sm:hidden">
+            <select
+              value={roomTypeFilter}
+              onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')}
+              className="w-full rounded-2xl border-slate-200"
+            >
+              <option value="all">All rooms</option>
+              <option value="private">Private only</option>
+              <option value="shared">Shared only</option>
+            </select>
+            <select
+              value={sectionFilter}
+              onChange={(event) => setSectionFilter(event.target.value)}
+              className="w-full rounded-2xl border-slate-200"
+            >
+              <option value="all">All locations</option>
+              {sectionOrder.map((section) => (
+                <option key={section} value={section}>
+                  {section}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="hidden flex-wrap gap-2 sm:flex">
             <Button
               size="sm"
               variant={roomTypeFilter === 'all' ? 'primary' : 'secondary'}
@@ -326,7 +366,7 @@ export const AdminCleaningTasksPage = () => {
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="hidden flex-wrap gap-2 sm:flex">
             <Button
               size="sm"
               variant={sectionFilter === 'all' ? 'primary' : 'secondary'}
@@ -345,16 +385,16 @@ export const AdminCleaningTasksPage = () => {
               </Button>
             ))}
           </div>
-        </div>
+            </div>
 
-        <div className="mt-6 grid gap-6">
+            <div className="mt-6 grid gap-6">
           {groupedRooms.length ? groupedRooms.map((group) => (
             <div key={group.section} className="grid gap-3">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="font-display text-xl font-semibold text-ink">{group.section}</h4>
                 <span className="text-sm text-slate-500">{group.rooms.length} rooms</span>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
                 {group.rooms.map(({ room, status }) => (
                   <button
                     key={room.id}
@@ -363,13 +403,13 @@ export const AdminCleaningTasksPage = () => {
                       setSelectedRoom(room)
                       setRoomModalOpen(true)
                     }}
-                    className="rounded-[24px] px-4 py-4 text-left text-white shadow-soft transition hover:-translate-y-0.5"
+                    className="min-w-0 rounded-[24px] px-4 py-4 text-left text-white shadow-soft transition hover:-translate-y-0.5"
                     style={{ backgroundColor: status.color }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-display text-xl font-semibold">{room.code}</p>
-                        <p className="mt-1 text-xs font-medium text-white/85">{room.roomType === 'shared' ? `${room.bedCount} beds` : 'Private room'}</p>
+                        <p className="mt-1 break-words text-xs font-medium text-white/85">{room.roomType === 'shared' ? `${room.bedCount} beds` : 'Private room'}</p>
                       </div>
                       {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
                     </div>
@@ -392,15 +432,27 @@ export const AdminCleaningTasksPage = () => {
               No rooms match the selected filters.
             </div>
           )}
-        </div>
+            </div>
+          </>
+        ) : null}
       </Panel>
 
       <Panel className="p-6">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="section-title">Custom places</h3>
+          <button
+            type="button"
+            onClick={() => setCustomPlacesOpen((current) => !current)}
+            className="flex items-center gap-2 text-left"
+          >
+            <h3 className="section-title">Custom places</h3>
+            <span className={`rounded-2xl bg-slate-100 p-2 text-slate-500 transition ${customPlacesOpen ? 'rotate-180' : ''}`}>
+              <ChevronDown size={16} />
+            </span>
+          </button>
           <span className="text-sm text-slate-500">{cleaningAreas.length} saved</span>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {customPlacesOpen ? (
+          <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {customPlaceCards.map(({ area, status }) => (
             <div key={area.id} className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -410,7 +462,66 @@ export const AdminCleaningTasksPage = () => {
                 </div>
                 <span className="h-7 w-7 rounded-full border border-white shadow-soft" style={{ backgroundColor: status.color }} />
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 sm:hidden">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPlace({
+                        placeType: 'custom',
+                        cleaningAreaId: area.id,
+                        placeLabel: area.name,
+                      })
+                      setStatusModalOpen(true)
+                    }}
+                  >
+                    Status
+                  </Button>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setOpenAreaManageId(openAreaManageId === area.id ? null : area.id)}
+                    >
+                      <UserCog size={15} className="mr-2" />
+                      Manage
+                    </Button>
+                    {openAreaManageId === area.id ? (
+                      <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setSelectedArea(area)
+                            setAreaOpen(true)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleCleaningArea(area.id)}>
+                          {area.isActive ? 'Disable' : 'Enable'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            if (!window.confirm(`Delete "${area.name}" permanently?`)) return
+                            void deleteCleaningArea(area.id)
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 hidden gap-2 sm:flex">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -451,7 +562,8 @@ export const AdminCleaningTasksPage = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        ) : null}
       </Panel>
 
       {filteredTasks.length === 0 ? (
@@ -475,16 +587,80 @@ export const AdminCleaningTasksPage = () => {
                         {task.cleaningRoomCode ?? task.cleaningLocationLabel}
                       </span>
                     </div>
-                    <h3 className="mt-3 font-display text-xl font-semibold text-ink">{task.title}</h3>
-                    <p className="mt-2 text-sm text-slate-500">{task.description}</p>
-                    <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
+                    <h3 className="mt-3 break-words font-display text-xl font-semibold text-ink">{task.title}</h3>
+                    <p className="mt-2 break-words text-sm text-slate-500">{task.description}</p>
+                    <div className="mt-4 grid gap-2 text-sm text-slate-500 sm:flex sm:flex-wrap sm:gap-4">
                       <span>Publishes {formatDateTime(task.publishedAt)}</span>
                       <span>Happens {formatDateTime(task.scheduledAt ?? task.publishedAt)}</span>
                       <span>{formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)}</span>
                       <span>{cleaner ? `Assigned to ${cleaner.name}` : 'Unassigned'}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="sm:hidden">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setAssignmentTask(task)
+                          setAssignmentOpen(true)
+                        }}
+                      >
+                        <UserPlus size={15} className="mr-2" />
+                        {cleaner ? 'Reassign' : 'Assign'}
+                      </Button>
+                      <div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setOpenTaskManageId(openTaskManageId === task.id ? null : task.id)}
+                        >
+                          <UserCog size={15} className="mr-2" />
+                          Manage
+                        </Button>
+                        {openTaskManageId === task.id ? (
+                          <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => {
+                                setSelectedTask(task)
+                                setModalOpen(true)
+                              }}
+                            >
+                              <Pencil size={15} className="mr-2" />
+                              Edit
+                            </Button>
+                            {task.status === 'draft' || task.status === 'scheduled' ? (
+                              <Button variant="secondary" size="sm" className="w-full" onClick={() => publishCleaningTask(task.id)}>
+                                <SendToBack size={15} className="mr-2" />
+                                Publish
+                              </Button>
+                            ) : null}
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleCleaningTaskCancelled(task.id)}>
+                              <Trash2 size={15} className="mr-2" />
+                              {task.status === 'cancelled' ? 'Reactivate' : 'Disable'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => {
+                                if (!window.confirm(`Delete "${task.title}" permanently?`)) return
+                                void deleteCleaningTask(task.id)
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hidden flex-wrap gap-2 sm:flex">
                     <Button
                       variant="secondary"
                       size="sm"

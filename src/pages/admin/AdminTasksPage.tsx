@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Pencil, Plus, Search, SendToBack, Trash2, UserPlus } from 'lucide-react'
+import { CalendarClock, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { TaskAssignmentModal } from '../../components/admin/TaskAssignmentModal'
 import { TaskEditorModal } from '../../components/admin/TaskEditorModal'
 import { PriorityBadge, StatusBadge } from '../../components/common/Badge'
@@ -26,6 +26,7 @@ export const AdminTasksPage = () => {
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [assignmentTask, setAssignmentTask] = useState<Task | null>(null)
+  const [openManageId, setOpenManageId] = useState<string | null>(null)
 
   const filteredTasks = useMemo(
     () =>
@@ -121,7 +122,71 @@ export const AdminTasksPage = () => {
                         <span>{assignedVolunteer ? `Assigned to ${assignedVolunteer.name}` : 'Unassigned'}</span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="sm:hidden">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setAssignmentTask(task)
+                            setAssignmentOpen(true)
+                          }}
+                        >
+                          <UserPlus size={15} className="mr-2" />
+                          {assignedVolunteer ? 'Reassign' : 'Assign'}
+                        </Button>
+                        <div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setOpenManageId(openManageId === task.id ? null : task.id)}
+                          >
+                            <UserCog size={15} className="mr-2" />
+                            Manage
+                          </Button>
+                          {openManageId === task.id ? (
+                            <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  setSelectedTask(task)
+                                  setModalOpen(true)
+                                }}
+                              >
+                                <Pencil size={15} className="mr-2" />
+                                Edit
+                              </Button>
+                              {task.status === 'draft' || task.status === 'scheduled' ? (
+                                <Button variant="secondary" size="sm" className="w-full" onClick={() => void publishTask(task.id)}>
+                                  <SendToBack size={15} className="mr-2" />
+                                  Publish
+                                </Button>
+                              ) : null}
+                              <Button variant="ghost" size="sm" className="w-full" onClick={() => void toggleTaskCancelled(task.id)}>
+                                <Trash2 size={15} className="mr-2" />
+                                {task.status === 'cancelled' ? 'Reactivate' : 'Disable'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  if (!window.confirm(`Delete "${task.title}" permanently?`)) return
+                                  void deleteTask(task.id)
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="hidden flex-wrap gap-2 sm:flex">
                       <Button
                         variant="secondary"
                         size="sm"

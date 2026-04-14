@@ -58,8 +58,12 @@ export const RoomStatusModal = ({
   const [bedCount, setBedCount] = useState(initialBedCount)
   const [beds, setBeds] = useState<BedStatus[]>(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
   const [showStructureSettings, setShowStructureSettings] = useState(false)
+  const [selectedBedNumber, setSelectedBedNumber] = useState(1)
+  const [mobileVolunteerPromptOpen, setMobileVolunteerPromptOpen] = useState(false)
 
   useEffect(() => {
+    if (!open) return
+
     setRoomType(currentStatus?.roomType ?? room.roomType)
     setRoomLabel(currentStatus?.roomServiceLabel ?? currentStatus?.label ?? 'Clean')
     setRoomColor(currentStatus?.roomServiceColor ?? currentStatus?.color ?? '#22c55e')
@@ -68,7 +72,9 @@ export const RoomStatusModal = ({
     setBedCount(room.roomType === 'private' ? 1 : Math.max(2, room.bedCount, currentStatus?.beds.length ?? 0))
     setBeds(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
     setShowStructureSettings(false)
-  }, [currentStatus, room])
+    setSelectedBedNumber(1)
+    setMobileVolunteerPromptOpen(false)
+  }, [open, room.id, currentStatus?.id])
 
   const visibleBeds = useMemo(() => {
     if (roomType === 'private') {
@@ -119,8 +125,9 @@ export const RoomStatusModal = ({
     return normalized === 'needs making' || normalized === 'check'
   })
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const selectedBed = visibleBeds.find((bed) => bed.bedNumber === selectedBedNumber) ?? visibleBeds[0]
+
+  const submitRoomSetup = () => {
     const nextBeds = visibleBeds
 
     onSubmit({
@@ -141,12 +148,26 @@ export const RoomStatusModal = ({
     onClose()
   }
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    submitRoomSetup()
+  }
+
+  const handleMobileSave = () => {
+    if (hasBedsToAssign && !mobileVolunteerPromptOpen) {
+      setMobileVolunteerPromptOpen(true)
+      return
+    }
+
+    submitRoomSetup()
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={room.label}
-      panelClassName="h-[100dvh] max-h-[100dvh] max-w-4xl rounded-none p-4 sm:max-h-[90vh] sm:rounded-[28px] sm:p-6"
+      title={`Room ${room.code}`}
+      panelClassName="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] max-w-4xl self-end rounded-t-[28px] rounded-b-none p-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:h-auto sm:max-h-[90vh] sm:self-auto sm:rounded-[28px] sm:p-6"
       bodyClassName="mt-4 overflow-hidden"
       description={
         roomType === 'shared'
@@ -154,8 +175,166 @@ export const RoomStatusModal = ({
           : 'Private rooms keep the room status plus an optional volunteer task for making or checking the bed.'
       }
     >
-      <form onSubmit={handleSubmit} className="grid h-full min-h-0 gap-4 grid-rows-[auto_minmax(0,1fr)] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
-        <div className="order-2 min-h-0 overflow-y-auto pr-1 lg:order-1">
+      <form onSubmit={handleSubmit} className="grid h-full min-h-0 gap-4 grid-rows-[minmax(0,1fr)_auto] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
+        <div className="order-1 min-h-0 overflow-y-auto pr-1 lg:order-1">
+          <div className="grid gap-5 lg:hidden">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-display text-2xl font-semibold text-ink">{`Room ${room.code}`}</p>
+                  <p className="mt-1 text-sm text-slate-500">{room.section}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStructureSettings((current) => !current)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-600"
+                >
+                  <Settings2 size={18} />
+                </button>
+              </div>
+
+              {showStructureSettings ? (
+                <div className="mt-4 grid gap-4 border-t border-slate-200 pt-4">
+                  <div className="flex gap-2">
+                    <Button type="button" variant={roomType === 'private' ? 'primary' : 'secondary'} onClick={() => setRoomType('private')}>
+                      Private
+                    </Button>
+                    <Button type="button" variant={roomType === 'shared' ? 'primary' : 'secondary'} onClick={() => setRoomType('shared')}>
+                      Shared
+                    </Button>
+                  </div>
+
+                  {roomType === 'shared' ? (
+                    <label className="grid gap-2 text-sm font-medium text-ink">
+                      Beds in this room
+                      <input
+                        type="number"
+                        min={2}
+                        max={14}
+                        value={bedCount}
+                        onChange={(event) => setBedCount(Number(event.target.value))}
+                        className="rounded-2xl border-slate-200"
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-ink">Room status</p>
+                <span
+                  className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white shadow-soft"
+                  style={{ backgroundColor: roomColor }}
+                >
+                  {roomLabel}
+                </span>
+              </div>
+              <select
+                value={roomLabel}
+                onChange={(event) => {
+                  const next = roomPresets.find((preset) => preset.label === event.target.value)
+                  if (!next) return
+                  setRoomLabel(next.label)
+                  setRoomColor(next.color)
+                }}
+                className="mt-3 w-full min-w-0 rounded-2xl border-slate-200"
+              >
+                {roomPresets.map((preset) => (
+                  <option key={preset.label} value={preset.label}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {['need cleaning', 'needs cleaning'].includes(roomLabel.trim().toLowerCase()) ? (
+              <label className="grid gap-2 rounded-[24px] border border-slate-200 bg-white p-4 text-sm font-medium text-ink">
+                Assign cleaning task to
+                <select
+                  value={assignCleanerId}
+                  onChange={(event) => setAssignCleanerId(event.target.value)}
+                  className="rounded-2xl border-slate-200"
+                >
+                  <option value="">Leave unassigned</option>
+                  {cleaners.map((cleaner) => (
+                    <option key={cleaner.id} value={cleaner.id}>
+                      {cleaner.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <div className="grid gap-3">
+              {visibleBeds.map((bed) => {
+                const selected = selectedBed?.bedNumber === bed.bedNumber
+                return (
+                  <div
+                    key={bed.bedNumber}
+                    className={`rounded-[24px] border px-4 py-4 text-left transition ${
+                      selected ? 'border-teal bg-teal/5 shadow-soft' : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBedNumber(bed.bedNumber)}
+                      className="w-full text-left"
+                    >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-ink">Bed {bed.bedNumber}</p>
+                        {bedTaskAssignees[bed.bedNumber]?.current ? (
+                          <p className="mt-1 text-xs font-medium text-slate-500">
+                            Assigned now: {bedTaskAssignees[bed.bedNumber]?.current}
+                          </p>
+                        ) : bedTaskAssignees[bed.bedNumber]?.last ? (
+                          <p className="mt-1 text-xs font-medium text-slate-500">
+                            Last assigned: {bedTaskAssignees[bed.bedNumber]?.last}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs font-medium text-slate-500">Tap to change status</p>
+                        )}
+                      </div>
+                      <span
+                        className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
+                        style={{ backgroundColor: bed.color }}
+                      >
+                        {bed.label}
+                      </span>
+                    </div>
+                    </button>
+
+                    {selected ? (
+                      <div className="mt-3 border-t border-slate-200 pt-3">
+                        <label className="grid gap-2 text-sm font-medium text-ink">
+                          Change bed status
+                          <select
+                            value={bed.label}
+                            onChange={(event) => {
+                              const next = bedPresets.find((preset) => preset.label === event.target.value)
+                              if (!next) return
+                              updateBed(bed.bedNumber, next)
+                            }}
+                            className="w-full rounded-2xl border-slate-200"
+                          >
+                            {bedPresets.map((preset) => (
+                              <option key={preset.label} value={preset.label}>
+                                {preset.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="hidden lg:block">
           {roomType === 'private' ? (
             <div className="rounded-[24px] bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -241,13 +420,15 @@ export const RoomStatusModal = ({
               </div>
             </div>
           )}
+          </div>
         </div>
 
-        <div className="order-1 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:min-h-0 lg:gap-4 lg:overflow-y-auto">
+        <div className="hidden flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:flex lg:h-full lg:min-h-0 lg:gap-4 lg:overflow-y-auto">
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-ink">Room setup</p>
+                <p className="text-sm font-medium text-ink lg:block hidden">Room setup</p>
+                <p className="text-sm font-medium text-ink lg:hidden">Room {room.code}</p>
                 <p className="mt-1 text-sm text-slate-500">
                   {roomType === 'private' ? 'Private room' : `${bedCount} beds in shared room`}
                 </p>
@@ -299,7 +480,25 @@ export const RoomStatusModal = ({
                 {roomLabel}
               </span>
             </div>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-3 grid gap-2 lg:hidden">
+              <select
+                value={roomLabel}
+                onChange={(event) => {
+                  const next = roomPresets.find((preset) => preset.label === event.target.value)
+                  if (!next) return
+                  setRoomLabel(next.label)
+                  setRoomColor(next.color)
+                }}
+                className="rounded-2xl border-slate-200"
+              >
+                {roomPresets.map((preset) => (
+                  <option key={preset.label} value={preset.label}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-3 hidden gap-2 lg:grid">
               {roomPresets.map((preset) => (
                 <button
                   key={preset.label}
@@ -371,6 +570,38 @@ export const RoomStatusModal = ({
             </Button>
             <Button type="submit" className="flex-1">
               Save room setup
+            </Button>
+          </div>
+        </div>
+
+        <div className="order-2 grid gap-3 border-t border-slate-200 bg-white pt-3 lg:hidden">
+          {mobileVolunteerPromptOpen && hasBedsToAssign ? (
+            <label className="grid gap-2 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-ink">
+              Assign selected bed tasks to
+              <select
+                value={assignVolunteerId}
+                onChange={(event) => setAssignVolunteerId(event.target.value)}
+                className="rounded-2xl border-slate-200"
+              >
+                <option value="">Leave unassigned</option>
+                {volunteers.map((volunteer) => (
+                  <option key={volunteer.id} value={volunteer.id}>
+                    {volunteer.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs font-normal text-slate-500">
+                Beds marked as Needs making or Check will be assigned separately. If left empty, they stay available for anyone to claim.
+              </span>
+            </label>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="secondary" onClick={onClose} className="w-full">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleMobileSave} className="w-full">
+              Save setup
             </Button>
           </div>
         </div>

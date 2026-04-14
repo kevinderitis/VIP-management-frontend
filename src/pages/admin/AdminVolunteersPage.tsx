@@ -21,6 +21,7 @@ export const AdminVolunteersPage = () => {
   const [selectedVolunteer, setSelectedVolunteer] = useState<User | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [openManageId, setOpenManageId] = useState<string | null>(null)
 
   const filteredVolunteers = useMemo(
     () =>
@@ -130,11 +131,64 @@ export const AdminVolunteersPage = () => {
                   <ProgressBar value={volunteer.points} max={320} className="mt-3" />
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 sm:hidden">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link to={`/admin/volunteers/${volunteer.id}`}>
+                      <Button variant="secondary" size="sm" className="w-full">
+                        <UserRoundSearch size={15} className="mr-2" />
+                        Profile
+                      </Button>
+                    </Link>
+                    <div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setOpenManageId(openManageId === volunteer.id ? null : volunteer.id)}
+                      >
+                        <UserCog size={15} className="mr-2" />
+                        Manage
+                      </Button>
+                      {openManageId === volunteer.id ? (
+                        <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setSelectedVolunteer(volunteer)
+                            setModalOpen(true)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleVolunteer(volunteer.id)}>
+                          {volunteer.isActive ? 'Disable' : 'Enable'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            if (!window.confirm(`Delete ${volunteer.name} permanently?`)) return
+                            void deleteVolunteer(volunteer.id)
+                          }}
+                        >
+                          <Trash2 size={15} className="mr-2" />
+                          Delete
+                        </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 hidden flex-wrap gap-2 sm:flex">
                   <Link to={`/admin/volunteers/${volunteer.id}`}>
                     <Button variant="secondary" size="sm">
                       <UserRoundSearch size={15} className="mr-2" />
-                      View profile
+                      Profile
                     </Button>
                   </Link>
                   <Button

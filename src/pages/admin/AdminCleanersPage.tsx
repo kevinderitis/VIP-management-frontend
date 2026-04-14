@@ -19,6 +19,7 @@ export const AdminCleanersPage = () => {
   const [selectedCleaner, setSelectedCleaner] = useState<User | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [openManageId, setOpenManageId] = useState<string | null>(null)
 
   const filtered = useMemo(
     () =>
@@ -102,11 +103,64 @@ export const AdminCleanersPage = () => {
                       {cleaner.completedTasks} completed tasks
                     </div>
                   </div>
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 sm:hidden">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link to={`/admin/cleaners/${cleaner.id}`}>
+                        <Button variant="secondary" size="sm" className="w-full">
+                          <UserRoundSearch size={15} className="mr-2" />
+                          Profile
+                        </Button>
+                      </Link>
+                      <div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setOpenManageId(openManageId === cleaner.id ? null : cleaner.id)}
+                        >
+                          <UserCog size={15} className="mr-2" />
+                          Manage
+                        </Button>
+                        {openManageId === cleaner.id ? (
+                          <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setSelectedCleaner(cleaner)
+                              setModalOpen(true)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleCleaner(cleaner.id)}>
+                            {cleaner.isActive ? 'Disable' : 'Enable'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              if (!window.confirm(`Delete ${cleaner.name} permanently?`)) return
+                              void deleteCleaner(cleaner.id)
+                            }}
+                          >
+                            <Trash2 size={15} className="mr-2" />
+                            Delete
+                          </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 hidden flex-wrap gap-2 sm:flex">
                     <Link to={`/admin/cleaners/${cleaner.id}`}>
                       <Button variant="secondary" size="sm">
                         <UserRoundSearch size={15} className="mr-2" />
-                        View profile
+                        Profile
                       </Button>
                     </Link>
                     <Button

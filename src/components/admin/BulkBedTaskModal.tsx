@@ -140,11 +140,11 @@ export const BulkBedTaskModal = ({
       onClose={onClose}
       title="Create bed tasks in bulk"
       description="Select rooms, choose the exact beds, and optionally assign all resulting tasks to one volunteer."
-      panelClassName="h-[100dvh] max-h-[100dvh] max-w-6xl rounded-none p-4 sm:max-h-[90vh] sm:rounded-[28px] sm:p-6"
+      panelClassName="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] max-w-6xl self-end rounded-t-[28px] rounded-b-none p-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:h-auto sm:max-h-[90vh] sm:self-auto sm:rounded-[28px] sm:p-6"
       bodyClassName="mt-4 min-h-0 overflow-hidden"
     >
-      <div className="grid h-full min-h-0 gap-4 grid-rows-[auto_minmax(0,1fr)] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
-        <div className={`min-h-0 overflow-y-auto pr-1 ${mobileStep === 'configure' ? 'hidden lg:block' : 'order-2 lg:order-1'}`}>
+      <div className="grid h-full min-h-0 gap-4 grid-rows-[minmax(0,1fr)_auto] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
+        <div className={`min-h-0 overflow-y-auto pr-1 ${mobileStep === 'configure' ? 'hidden lg:block' : 'order-1 lg:order-1'}`}>
           <div className="space-y-5">
             {groups.map((group) => (
               <div key={group.section} className="grid gap-3">
@@ -226,12 +226,8 @@ export const BulkBedTaskModal = ({
           </div>
         </div>
 
-        <div
-          className={`order-1 flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:min-h-0 lg:gap-4 lg:overflow-y-auto ${
-            mobileStep === 'select' ? 'lg:flex' : ''
-          } ${mobileStep === 'select' ? 'flex' : 'flex'}`}
-        >
-          <div className="flex items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4">
+        <div className="order-1 flex min-h-0 flex-col gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:order-2 lg:h-full lg:gap-4 lg:overflow-y-auto">
+          <div className="hidden items-start justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4 sm:flex">
             <p className="text-sm text-slate-500">
               Select rooms, choose the exact beds, and optionally assign all resulting tasks to one volunteer.
             </p>
@@ -325,31 +321,7 @@ export const BulkBedTaskModal = ({
             </div>
           </div>
 
-          <div className="mt-1 grid gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:sticky lg:bottom-0 lg:mt-auto">
-            <div className="grid gap-3 lg:hidden">
-              {mobileStep === 'select' ? (
-                <>
-                  <Button type="button" variant="secondary" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button type="button" disabled={selectionCount === 0} onClick={() => setMobileStep('configure')}>
-                    Next
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button type="button" variant="secondary" onClick={() => setMobileStep('select')}>
-                    Back
-                  </Button>
-                  <Button type="button" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button type="button" disabled={selectionCount === 0} onClick={handleSubmit}>
-                    Confirm
-                  </Button>
-                </>
-              )}
-            </div>
+          <div className="hidden gap-3 border-t border-slate-200 bg-slate-50 pt-3 lg:grid lg:sticky lg:bottom-0 lg:mt-auto">
             <div className="hidden gap-3 lg:grid">
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancel
@@ -359,6 +331,28 @@ export const BulkBedTaskModal = ({
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="order-2 grid gap-3 border-t border-slate-200 bg-white pt-3 lg:hidden">
+          {mobileStep === 'select' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant="secondary" onClick={onClose} className="w-full">
+                Cancel
+              </Button>
+              <Button type="button" disabled={selectionCount === 0} onClick={() => setMobileStep('configure')} className="w-full">
+                Next
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant="secondary" onClick={() => setMobileStep('select')} className="w-full">
+                Back
+              </Button>
+              <Button type="button" disabled={selectionCount === 0} onClick={handleSubmit} className="w-full">
+                Confirm
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </Modal>
