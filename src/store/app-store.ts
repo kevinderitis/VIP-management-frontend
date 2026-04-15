@@ -62,6 +62,7 @@ type AppState = ServerState & {
   toggleTaskCancelled: (taskId: string) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   assignTask: (taskId: string, volunteerId: string) => Promise<void>
+  unassignTask: (taskId: string) => Promise<void>
   takeTask: (taskId: string, volunteerId: string) => Promise<void>
   releaseTask: (taskId: string, volunteerId: string) => Promise<void>
   completeTask: (taskId: string, volunteerId: string, resultingBedState?: 'READY' | 'OCCUPIED') => Promise<void>
@@ -109,6 +110,7 @@ type AppState = ServerState & {
   toggleRoutineTask: (routineTaskId: string) => Promise<void>
   deleteRoutineTask: (routineTaskId: string) => Promise<void>
   deleteRoutineAssignment: (assignmentId: string) => Promise<void>
+  reassignRoutineAssignment: (assignmentId: string, volunteerId: string) => Promise<void>
   assignRoutineTask: (
     routineTaskId: string,
     volunteerId: string,
@@ -454,6 +456,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Task assigned', 'The task was assigned to the selected volunteer.', 'info'),
+    }))
+  },
+
+  unassignTask: async (taskId) => {
+    await apiRequest(`/tasks/${taskId}/unassign`, {
+      method: 'POST',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Assignment removed', 'The task was returned to the shared volunteer board.', 'info'),
     }))
   },
 
@@ -1050,6 +1063,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Recurring assignment removed', 'The assignment and its generated task slots were deleted.', 'warning'),
+    }))
+  },
+
+  reassignRoutineAssignment: async (assignmentId, volunteerId) => {
+    await apiRequest(`/routine-tasks/assignments/${assignmentId}/reassign`, {
+      method: 'PATCH',
+      token: get().accessToken,
+      body: { volunteerId },
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Recurring assignment reassigned', 'The recurring schedule now belongs to the selected volunteer.', 'info'),
     }))
   },
 

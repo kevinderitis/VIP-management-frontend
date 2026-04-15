@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound } from 'lucide-react'
+import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound, UserPlus } from 'lucide-react'
+import { RoutineAssignmentReassignModal } from '../../components/admin/RoutineAssignmentReassignModal'
+import { TaskAssignmentModal } from '../../components/admin/TaskAssignmentModal'
 import { Button } from '../../components/common/Button'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore } from '../../store/app-store'
+import { Task } from '../../types/models'
 import { formatDate, formatDateTime, formatTimeRange, formatWeekday } from '../../utils/format'
 
 type AssignmentRow = {
@@ -18,6 +21,8 @@ type AssignmentRow = {
   schedule: string
   meta?: string
   removeId?: string
+  volunteerId?: string
+  taskId?: string
 }
 
 const isoDate = (value?: string) => {
@@ -37,6 +42,9 @@ export const AdminAssignmentsPage = () => {
   const routineAssignments = useAppStore((state) => state.routineAssignments)
   const activities = useAppStore((state) => state.activities)
   const deleteRoutineAssignment = useAppStore((state) => state.deleteRoutineAssignment)
+  const reassignRoutineAssignment = useAppStore((state) => state.reassignRoutineAssignment)
+  const assignTask = useAppStore((state) => state.assignTask)
+  const unassignTask = useAppStore((state) => state.unassignTask)
 
   const volunteers = useMemo(
     () => users.filter((user) => user.role === 'volunteer').sort((left, right) => left.name.localeCompare(right.name)),
@@ -49,6 +57,8 @@ export const AdminAssignmentsPage = () => {
   const [taskTypeFilter, setTaskTypeFilter] = useState<'all' | 'manual' | 'recurring'>('all')
   const [page, setPage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
+  const [manualAssignmentTask, setManualAssignmentTask] = useState<Task | null>(null)
+  const [recurringAssignmentRow, setRecurringAssignmentRow] = useState<AssignmentRow | null>(null)
   const pageSize = 12
   const historyPageSize = 8
 
@@ -74,6 +84,8 @@ export const AdminAssignmentsPage = () => {
           detail: task.description,
           schedule: formatTimeRange(startsAt, task.endsAt),
           meta: task.points ? `${task.points} pts` : undefined,
+          volunteerId: task.assignedTo,
+          taskId: task.id,
         }
       })
 
@@ -95,6 +107,7 @@ export const AdminAssignmentsPage = () => {
         schedule: `${assignment.startTime} - ${assignment.endTime}`,
         meta: `${generatedTasks.length} generated task${generatedTasks.length === 1 ? '' : 's'}`,
         removeId: assignment.id,
+        volunteerId: assignment.volunteerId,
       }
     })
 
@@ -258,19 +271,56 @@ export const AdminAssignmentsPage = () => {
                   </div>
 
                   {row.removeId ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const removeId = row.removeId
-                        if (!removeId) return
-                        if (!window.confirm(`Remove "${row.title}" from ${row.volunteerName}?`)) return
-                        void deleteRoutineAssignment(removeId)
-                      }}
-                    >
-                      <Trash2 size={14} className="mr-2" />
-                      Remove
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setRecurringAssignmentRow(row)}
+                      >
+                        <UserPlus size={14} className="mr-2" />
+                        Reassign
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const removeId = row.removeId
+                          if (!removeId) return
+                          if (!window.confirm(`Remove "${row.title}" from ${row.volunteerName}?`)) return
+                          void deleteRoutineAssignment(removeId)
+                        }}
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  ) : row.taskId ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const task = tasks.find((item) => item.id === row.taskId)
+                          if (!task) return
+                          setManualAssignmentTask(task)
+                        }}
+                      >
+                        <UserPlus size={14} className="mr-2" />
+                        Reassign
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!row.taskId) return
+                          if (!window.confirm(`Remove "${row.title}" from ${row.volunteerName} and return it to the shared board?`)) return
+                          void unassignTask(row.taskId)
+                        }}
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Remove
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
 
@@ -349,6 +399,29 @@ export const AdminAssignmentsPage = () => {
           </div>
         ) : null}
       </Panel>
+
+      <TaskAssignmentModal
+        key={manualAssignmentTask?.id ?? 'manual-assignment'}
+        open={Boolean(manualAssignmentTask)}
+        onClose={() => setManualAssignmentTask(null)}
+        task={manualAssignmentTask}
+        onSubmit={(volunteerId) => {
+          if (!manualAssignmentTask) return
+          void assignTask(manualAssignmentTask.id, volunteerId)
+        }}
+      />
+
+      <RoutineAssignmentReassignModal
+        key={recurringAssignmentRow?.id ?? 'recurring-assignment'}
+        open={Boolean(recurringAssignmentRow)}
+        onClose={() => setRecurringAssignmentRow(null)}
+        currentVolunteerId={recurringAssignmentRow?.volunteerId}
+        assignmentTitle={recurringAssignmentRow?.title}
+        onSubmit={(volunteerId) => {
+          if (!recurringAssignmentRow?.removeId) return
+          void reassignRoutineAssignment(recurringAssignmentRow.removeId, volunteerId)
+        }}
+      />
     </div>
   )
 }
