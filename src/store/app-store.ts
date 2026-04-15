@@ -519,6 +519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({
         toasts: addToast(state.toasts, 'Could not create volunteer', error instanceof Error ? error.message : 'Validation failed.', 'warning'),
       }))
+      throw error
     }
   },
 
@@ -537,6 +538,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({
         toasts: addToast(state.toasts, 'Could not update volunteer', error instanceof Error ? error.message : 'Validation failed.', 'warning'),
       }))
+      throw error
     }
   },
 

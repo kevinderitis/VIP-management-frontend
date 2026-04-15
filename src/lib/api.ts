@@ -32,7 +32,18 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
 
     try {
       const payload = await response.json()
-      message = payload.message ?? payload.error ?? message
+      if (payload?.message === 'Validation failed' && payload?.errors?.fieldErrors) {
+        const fieldMessages = Object.entries(payload.errors.fieldErrors as Record<string, string[]>)
+          .flatMap(([, errors]) => errors ?? [])
+          .filter(Boolean)
+        if (fieldMessages.length) {
+          message = fieldMessages.join(' ')
+        } else {
+          message = payload.message ?? payload.error ?? message
+        }
+      } else {
+        message = payload.message ?? payload.error ?? message
+      }
     } catch {
       message = response.statusText || message
     }
