@@ -1,3 +1,5 @@
+const SYSTEM_TIMEZONE = 'UTC'
+
 export const formatDateTime = (value?: string) => {
   if (!value) return 'Not set'
 
@@ -6,6 +8,7 @@ export const formatDateTime = (value?: string) => {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: SYSTEM_TIMEZONE,
   }).format(new Date(value))
 }
 
@@ -15,6 +18,7 @@ export const formatTime = (value?: string) => {
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: SYSTEM_TIMEZONE,
   }).format(new Date(value))
 }
 
@@ -31,6 +35,7 @@ export const formatDate = (value?: string) => {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
+    timeZone: SYSTEM_TIMEZONE,
   }).format(new Date(value))
 }
 
@@ -50,15 +55,27 @@ export const formatWeekday = (value: string) =>
 
 export const toLocalDateKey = (value: string | Date = new Date()) => {
   const date = new Date(value)
-  const offset = date.getTimezoneOffset()
-  const local = new Date(date.getTime() - offset * 60 * 1000)
-  return local.toISOString().slice(0, 10)
+  const year = date.getUTCFullYear()
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getUTCDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export const toDateTimeLocal = (value?: string) => {
   if (!value) return ''
   const date = new Date(value)
-  const offset = date.getTimezoneOffset()
-  const local = new Date(date.getTime() - offset * 60 * 1000)
-  return local.toISOString().slice(0, 16)
+  const year = date.getUTCFullYear()
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getUTCDate()}`.padStart(2, '0')
+  const hours = `${date.getUTCHours()}`.padStart(2, '0')
+  const minutes = `${date.getUTCMinutes()}`.padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+export const fromDateTimeLocal = (value?: string) => {
+  if (!value) return undefined
+  const [datePart, timePart] = value.split('T')
+  if (!datePart || !timePart) return undefined
+  const normalizedTime = timePart.length === 5 ? `${timePart}:00` : timePart
+  return `${datePart}T${normalizedTime}.000Z`
 }

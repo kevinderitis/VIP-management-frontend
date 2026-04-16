@@ -28,21 +28,80 @@ export const AdminTasksPage = () => {
   const [assignmentTask, setAssignmentTask] = useState<Task | null>(null)
   const [openManageId, setOpenManageId] = useState<string | null>(null)
 
-  const filteredTasks = useMemo(
-    () =>
-      tasks.filter((task) => {
-        if (task.audience !== 'volunteer' || task.source !== 'manual') {
-          return false
-        }
+  const filteredTasks = useMemo(() => {
+    const visibleTasks = tasks.filter((task) => {
+      if (task.audience !== 'volunteer') {
+        return false
+      }
 
-        const matchesStatus = statusFilter === 'all' || task.status === statusFilter
+      if (task.source === 'manual') {
+        return true
+      }
+
+      return task.source === 'routine' && task.status === 'available'
+    })
+
+    const grouped = new Map<
+      string,
+      {
+        task: Task
+        effectiveStatus: string
+        assignedCount: number
+        totalSlots: number
+      }
+    >()
+
+    visibleTasks.forEach((task) => {
+      const key = task.sharedTaskGroupId ?? task.id
+      const existing = grouped.get(key)
+      if (!existing) {
+        grouped.set(key, {
+          task,
+          effectiveStatus: task.status,
+          assignedCount: ['assigned', 'scheduled'].includes(task.status) ? 1 : 0,
+          totalSlots: task.sharedTaskGroupId ? task.volunteerSlots ?? 1 : 1,
+        })
+        return
+      }
+
+      existing.assignedCount += ['assigned', 'scheduled'].includes(task.status) ? 1 : 0
+
+      if (task.status === 'available') {
+        existing.effectiveStatus = 'available'
+        existing.task = task
+      } else if (
+        existing.effectiveStatus !== 'available' &&
+        task.status === 'assigned'
+      ) {
+        existing.effectiveStatus = 'assigned'
+      } else if (
+        existing.effectiveStatus !== 'available' &&
+        existing.effectiveStatus !== 'assigned' &&
+        task.status === 'scheduled'
+      ) {
+        existing.effectiveStatus = 'scheduled'
+      }
+    })
+
+    return Array.from(grouped.values())
+      .filter(({ task, effectiveStatus }) => {
+        const matchesStatus = statusFilter === 'all' || effectiveStatus === statusFilter
         const matchesSearch =
           task.title.toLowerCase().includes(search.toLowerCase()) ||
           task.description.toLowerCase().includes(search.toLowerCase())
         return matchesStatus && matchesSearch
-      }),
-    [search, statusFilter, tasks],
-  )
+      })
+      .map(({ task, assignedCount, totalSlots }) => ({
+        ...task,
+        status: (task.sharedTaskGroupId
+          ? assignedCount >= totalSlots
+            ? 'assigned'
+            : 'available'
+          : task.status) as Task['status'],
+        volunteerSlots: totalSlots,
+        assignedCount,
+      }))
+  }, [search, statusFilter, tasks])
 
   return (
     <div className="grid gap-6">
@@ -98,7 +157,7 @@ export const AdminTasksPage = () => {
       ) : (
         <div className="grid gap-4">
           {filteredTasks.map((task) => (
-            <Panel key={task.id} className="p-5">
+            <Panel key={task.sharedTaskGroupId ?? task.id} className="p-5">
               {(() => {
                 const assignedVolunteer = users.find((user) => user.id === task.assignedTo)
 
@@ -116,10 +175,28 @@ export const AdminTasksPage = () => {
                       <p className="mt-2 text-sm text-slate-500">{task.description}</p>
                       <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
                         <span>{task.points} pts</span>
+                        {task.volunteerSlots && task.volunteerSlots > 1 ? (
+                          <span>
+                            {task.assignedCount ?? 0} of {task.volunteerSlots} volunteer spots assigned
+                          </span>
+                        ) : null}
                         <span>Publishes {formatDateTime(task.publishedAt)}</span>
                         <span>Happens {formatDateTime(task.scheduledAt ?? task.publishedAt)}</span>
                         <span>{formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)}</span>
-                        <span>{assignedVolunteer ? `Assigned to ${assignedVolunteer.name}` : 'Unassigned'}</span>
+                        <span>
+                          {task.volunteerSlots && task.volunteerSlots > 1
+                            ? (task.assignedCount ?? 0) > 0
+                              ? 'Multi-volunteer common task'
+                              : 'No volunteers assigned yet'
+                            : assignedVolunteer
+                              ? `Assigned to ${assignedVolunteer.name}`
+                              : 'Unassigned'}
+                        </span>
+                        {task.source === 'routine' ? (
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                            Released recurring slot
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     <div className="sm:hidden">

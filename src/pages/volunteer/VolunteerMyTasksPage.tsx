@@ -8,17 +8,13 @@ import { SectionHeader } from '../../components/common/SectionHeader'
 import { TaskCard } from '../../components/volunteer/TaskCard'
 import { useAppStore, useSessionUser } from '../../store/app-store'
 import { Task } from '../../types/models'
-import { formatDate, formatDateTime, formatTimeRange, formatWeekday } from '../../utils/format'
+import { formatDate, formatDateTime, formatTimeRange, formatWeekday, toLocalDateKey } from '../../utils/format'
 
-const getLocalDateValue = (value = new Date()) => {
-  const offset = value.getTimezoneOffset()
-  const localDate = new Date(value.getTime() - offset * 60 * 1000)
-  return localDate.toISOString().slice(0, 10)
-}
+const getLocalDateValue = (value = new Date()) => toLocalDateKey(value)
 
 const getTaskDateValue = (value?: string) => {
   if (!value) return ''
-  return getLocalDateValue(new Date(value))
+  return toLocalDateKey(value)
 }
 
 export const VolunteerMyTasksPage = () => {

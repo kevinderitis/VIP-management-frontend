@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 import { Task, TaskCategory, TaskDraftInput, TaskPriority } from '../../types/models'
-import { toDateTimeLocal } from '../../utils/format'
+import { fromDateTimeLocal, toDateTimeLocal } from '../../utils/format'
 
 const categories: TaskCategory[] = [
   'housekeeping',
@@ -20,6 +20,7 @@ const emptyForm: TaskDraftInput = {
   category: 'housekeeping',
   priority: 'medium',
   points: 15,
+  volunteerSlots: 1,
   notes: '',
   publishAt: '',
   scheduledAt: '',
@@ -34,6 +35,7 @@ const getTaskForm = (task?: Task | null): TaskDraftInput =>
         category: task.category,
         priority: task.priority,
         points: task.points,
+        volunteerSlots: task.volunteerSlots ?? 1,
         notes: task.notes ?? '',
         publishAt: toDateTimeLocal(task.publishedAt),
         scheduledAt: toDateTimeLocal(task.scheduledAt),
@@ -60,24 +62,27 @@ export const TaskEditorModal = ({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const scheduledAtIso = fromDateTimeLocal(form.scheduledAt)
+    const endsAtIso = fromDateTimeLocal(form.endsAt)
+    const publishAtIso = fromDateTimeLocal(form.publishAt)
 
-    if (!form.scheduledAt || !form.endsAt) {
+    if (!scheduledAtIso || !endsAtIso) {
       setScheduleError('Start and end date/time are required.')
       return
     }
 
-    if (new Date(form.endsAt).getTime() <= new Date(form.scheduledAt).getTime()) {
+    if (new Date(endsAtIso).getTime() <= new Date(scheduledAtIso).getTime()) {
       setScheduleError('End time must be later than start time.')
       return
     }
 
     if (publishMode === 'scheduled') {
-      if (!form.publishAt) {
+      if (!publishAtIso) {
         setScheduleError('Publish date and time are required when scheduling publication.')
         return
       }
 
-      if (new Date(form.publishAt).getTime() > new Date(form.scheduledAt).getTime()) {
+      if (new Date(publishAtIso).getTime() > new Date(scheduledAtIso).getTime()) {
         setScheduleError('Publish time must be before the task start time.')
         return
       }
@@ -86,12 +91,9 @@ export const TaskEditorModal = ({
     setScheduleError('')
     onSubmit({
       ...form,
-      publishAt:
-        publishMode === 'scheduled' && form.publishAt
-          ? new Date(form.publishAt).toISOString()
-          : undefined,
-      scheduledAt: new Date(form.scheduledAt).toISOString(),
-      endsAt: new Date(form.endsAt).toISOString(),
+      publishAt: publishMode === 'scheduled' ? publishAtIso : undefined,
+      scheduledAt: scheduledAtIso,
+      endsAt: endsAtIso,
     })
     onClose()
   }
@@ -217,6 +219,22 @@ export const TaskEditorModal = ({
               className="rounded-2xl border-slate-200"
             />
           </label>
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Volunteer slots
+            <input
+              min={1}
+              max={20}
+              type="number"
+              value={form.volunteerSlots ?? 1}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  volunteerSlots: Math.max(1, Number(event.target.value) || 1),
+                }))
+              }
+              className="rounded-2xl border-slate-200"
+            />
+          </label>
           <label className="grid gap-2 text-sm font-medium text-ink sm:col-span-2">
             Start date and time
             <input
@@ -231,6 +249,16 @@ export const TaskEditorModal = ({
             />
           </label>
         </div>
+        {!task && (form.volunteerSlots ?? 1) > 1 ? (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700">
+            This common task will open {(form.volunteerSlots ?? 1)} separate volunteer spots for the same work.
+          </div>
+        ) : null}
+        {task ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            You can edit volunteer slots here. If you reduce the number, only free slots can be removed.
+          </div>
+        ) : null}
         <label className="grid gap-2 text-sm font-medium text-ink">
           End date and time
           <input

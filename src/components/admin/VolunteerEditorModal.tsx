@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { VolunteerDraftInput, User, Weekday } from '../../types/models'
+import { generatePlayfulPassword } from '../../utils/password'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 
@@ -108,8 +109,8 @@ export const VolunteerEditorModal = ({
     const normalizedForm: VolunteerDraftInput = {
       ...form,
       name: form.name.trim(),
-      email: form.email?.trim() ?? '',
-      username: form.username.trim(),
+      email: form.email?.trim().toLowerCase() ?? '',
+      username: form.username.trim().toLowerCase(),
       password: form.password.trim(),
       title: form.title.trim(),
       shift: form.shift.trim(),
@@ -143,6 +144,10 @@ export const VolunteerEditorModal = ({
     setSubmitError('')
   }
 
+  const handleGeneratePassword = () => {
+    handleFieldChange('password', generatePlayfulPassword())
+  }
+
   return (
     <Modal open={open} onClose={onClose} title={volunteer ? 'Edit volunteer' : 'New volunteer'}>
       <form onSubmit={handleSubmit} className="grid gap-4">
@@ -162,19 +167,27 @@ export const VolunteerEditorModal = ({
             <input
               required
               value={form.username}
-              onChange={(event) => handleFieldChange('username', event.target.value)}
+              onChange={(event) => handleFieldChange('username', event.target.value.toLowerCase())}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className={`rounded-2xl ${errors.username ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200'}`}
             />
             {errors.username ? <span className="text-xs font-medium text-red-600">{errors.username}</span> : null}
           </label>
           <label className="grid gap-2 text-sm font-medium text-ink">
             Password
-            <input
-              required
-              value={form.password}
-              onChange={(event) => handleFieldChange('password', event.target.value)}
-              className={`rounded-2xl ${errors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200'}`}
-            />
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
+              <input
+                required
+                value={form.password}
+                onChange={(event) => handleFieldChange('password', event.target.value)}
+                className={`rounded-2xl ${errors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200'}`}
+              />
+              <Button type="button" variant="secondary" onClick={handleGeneratePassword}>
+                Generate
+              </Button>
+            </div>
             {errors.password ? <span className="text-xs font-medium text-red-600">{errors.password}</span> : null}
           </label>
         </div>
@@ -183,8 +196,11 @@ export const VolunteerEditorModal = ({
           <input
             type="email"
             value={form.email ?? ''}
-            onChange={(event) => handleFieldChange('email', event.target.value)}
+            onChange={(event) => handleFieldChange('email', event.target.value.toLowerCase())}
             placeholder="Optional contact email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className={`rounded-2xl ${errors.email ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-slate-200'}`}
           />
           {errors.email ? <span className="text-xs font-medium text-red-600">{errors.email}</span> : null}

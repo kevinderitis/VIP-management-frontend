@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react'
 import { CalendarRange } from 'lucide-react'
 import { useVolunteerUsers } from '../../store/app-store'
 import { TaskGroup } from '../../types/models'
-import { formatDateTime, formatWeekday } from '../../utils/format'
+import { formatDateTime, formatWeekday, toLocalDateKey } from '../../utils/format'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 
@@ -20,7 +20,7 @@ export const AssignmentModal = ({
   const volunteers = useVolunteerUsers()
   const [groupId, setGroupId] = useState(groups[0]?.id ?? '')
   const [volunteerId, setVolunteerId] = useState(volunteers[0]?.id ?? '')
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [startDate, setStartDate] = useState(toLocalDateKey(new Date()))
   const [durationDays, setDurationDays] = useState(5)
 
   const group = groups.find((item) => item.id === groupId)
@@ -29,7 +29,7 @@ export const AssignmentModal = ({
   const preview = useMemo(() => {
     if (!group) return []
     return group.templates.map((template) => {
-      const scheduled = new Date(`${startDate}T${template.startTime}:00`)
+      const scheduled = new Date(`${startDate}T${template.startTime}:00.000Z`)
       scheduled.setDate(scheduled.getDate() + template.dayOffset - 1)
       return {
         id: template.id,
@@ -47,7 +47,7 @@ export const AssignmentModal = ({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSubmit(groupId, volunteerId, new Date(`${startDate}T08:00:00`).toISOString(), durationDays)
+    onSubmit(groupId, volunteerId, `${startDate}T08:00:00.000Z`, durationDays)
     onClose()
   }
 

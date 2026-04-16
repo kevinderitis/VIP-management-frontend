@@ -10,7 +10,19 @@ export const VolunteerTasksPage = () => {
   const allTasks = useAppStore((state) => state.tasks)
   const takeTask = useAppStore((state) => state.takeTask)
   const tasks = useMemo(
-    () => allTasks.filter((task) => task.audience === 'volunteer' && task.status === 'available'),
+    () => {
+      const availableTasks = allTasks.filter((task) => task.audience === 'volunteer' && task.status === 'available')
+      const grouped = new Map<string, typeof availableTasks[number]>()
+
+      availableTasks.forEach((task) => {
+        const key = task.sharedTaskGroupId ?? task.id
+        if (!grouped.has(key)) {
+          grouped.set(key, task)
+        }
+      })
+
+      return Array.from(grouped.values())
+    },
     [allTasks],
   )
 

@@ -58,7 +58,7 @@ export const RoomStatusModal = ({
   const [bedCount, setBedCount] = useState(initialBedCount)
   const [beds, setBeds] = useState<BedStatus[]>(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
   const [showStructureSettings, setShowStructureSettings] = useState(false)
-  const [selectedBedNumber, setSelectedBedNumber] = useState(1)
+  const [editingBedNumber, setEditingBedNumber] = useState<number | null>(null)
   const [mobileVolunteerPromptOpen, setMobileVolunteerPromptOpen] = useState(false)
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export const RoomStatusModal = ({
     setBedCount(room.roomType === 'private' ? 1 : Math.max(2, room.bedCount, currentStatus?.beds.length ?? 0))
     setBeds(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
     setShowStructureSettings(false)
-    setSelectedBedNumber(1)
+    setEditingBedNumber(null)
     setMobileVolunteerPromptOpen(false)
   }, [open, room.id, currentStatus?.id])
 
@@ -125,7 +125,11 @@ export const RoomStatusModal = ({
     return normalized === 'needs making' || normalized === 'check'
   })
 
-  const selectedBed = visibleBeds.find((bed) => bed.bedNumber === selectedBedNumber) ?? visibleBeds[0]
+  useEffect(() => {
+    if (editingBedNumber !== null && !visibleBeds.some((bed) => bed.bedNumber === editingBedNumber)) {
+      setEditingBedNumber(null)
+    }
+  }, [editingBedNumber, visibleBeds])
 
   const submitRoomSetup = () => {
     const nextBeds = visibleBeds
@@ -162,8 +166,48 @@ export const RoomStatusModal = ({
     submitRoomSetup()
   }
 
+  const editingBed = editingBedNumber !== null
+    ? visibleBeds.find((bed) => bed.bedNumber === editingBedNumber) ?? null
+    : null
+
+  const renderBedTile = (bed: BedStatus) => {
+    const assignee = bedTaskAssignees[bed.bedNumber]
+
+    return (
+      <button
+        key={bed.bedNumber}
+        type="button"
+        onClick={() => setEditingBedNumber(bed.bedNumber)}
+        className="min-w-0 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300 hover:shadow-soft"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-ink">Bed {bed.bedNumber}</p>
+            <p className="mt-1 break-words text-xs font-medium text-slate-500">
+              {assignee?.current
+                ? `Assigned now: ${assignee.current}`
+                : assignee?.last
+                  ? `Last assigned: ${assignee.last}`
+                  : 'Tap to change status'}
+            </p>
+          </div>
+          <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: bed.color }} />
+        </div>
+        <div className="mt-4 flex min-w-0 items-center justify-between gap-3">
+          <span
+            className="inline-flex min-w-0 max-w-full rounded-full px-3 py-1 text-xs font-semibold text-white"
+            style={{ backgroundColor: bed.color }}
+          >
+            <span className="truncate">{bed.label}</span>
+          </span>
+        </div>
+      </button>
+    )
+  }
+
   return (
-    <Modal
+    <>
+      <Modal
       open={open}
       onClose={onClose}
       title={`Room ${room.code}`}
@@ -267,159 +311,26 @@ export const RoomStatusModal = ({
               </label>
             ) : null}
 
-            <div className="grid gap-3">
-              {visibleBeds.map((bed) => {
-                const selected = selectedBed?.bedNumber === bed.bedNumber
-                return (
-                  <div
-                    key={bed.bedNumber}
-                    className={`rounded-[24px] border px-4 py-4 text-left transition ${
-                      selected ? 'border-teal bg-teal/5 shadow-soft' : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBedNumber(bed.bedNumber)}
-                      className="w-full text-left"
-                    >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-ink">Bed {bed.bedNumber}</p>
-                        {bedTaskAssignees[bed.bedNumber]?.current ? (
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            Assigned now: {bedTaskAssignees[bed.bedNumber]?.current}
-                          </p>
-                        ) : bedTaskAssignees[bed.bedNumber]?.last ? (
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            Last assigned: {bedTaskAssignees[bed.bedNumber]?.last}
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-xs font-medium text-slate-500">Tap to change status</p>
-                        )}
-                      </div>
-                      <span
-                        className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
-                        style={{ backgroundColor: bed.color }}
-                      >
-                        {bed.label}
-                      </span>
-                    </div>
-                    </button>
-
-                    {selected ? (
-                      <div className="mt-3 border-t border-slate-200 pt-3">
-                        <label className="grid gap-2 text-sm font-medium text-ink">
-                          Change bed status
-                          <select
-                            value={bed.label}
-                            onChange={(event) => {
-                              const next = bedPresets.find((preset) => preset.label === event.target.value)
-                              if (!next) return
-                              updateBed(bed.bedNumber, next)
-                            }}
-                            className="w-full rounded-2xl border-slate-200"
-                          >
-                            {bedPresets.map((preset) => (
-                              <option key={preset.label} value={preset.label}>
-                                {preset.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {visibleBeds.map(renderBedTile)}
+              </div>
             </div>
           </div>
 
           <div className="hidden lg:block">
-          {roomType === 'private' ? (
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-ink">Bed service request</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Use this when the bed should appear as a volunteer task.
-                  </p>
-                </div>
-                <span
-                  className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
-                  style={{ backgroundColor: visibleBeds[0]?.color ?? '#22c55e' }}
-                >
-                  {visibleBeds[0]?.label ?? 'Ready'}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {bedPresets.map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => updateBed(1, preset)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="h-4 w-4 rounded-full" style={{ backgroundColor: preset.color }} />
-                      <span className="text-sm font-semibold text-ink">{preset.label}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
             <div className="grid gap-5">
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-medium text-ink">Beds in this room</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Scroll through the beds and update each one independently.
+                  Use the grid to scan bed states quickly. Click any bed to open its status options.
                 </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                {visibleBeds.map((bed) => (
-                  <div key={bed.bedNumber} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-ink">Bed {bed.bedNumber}</p>
-                        <p className="mt-1 text-sm text-slate-500">Choose how this bed should appear on the room board.</p>
-                        {bedTaskAssignees[bed.bedNumber]?.current ? (
-                          <p className="mt-2 text-xs font-medium text-slate-500">
-                            Assigned now: {bedTaskAssignees[bed.bedNumber]?.current}
-                          </p>
-                        ) : bedTaskAssignees[bed.bedNumber]?.last ? (
-                          <p className="mt-2 text-xs font-medium text-slate-500">
-                            Last assigned: {bedTaskAssignees[bed.bedNumber]?.last}
-                          </p>
-                        ) : null}
-                      </div>
-                      <span
-                        className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
-                        style={{ backgroundColor: bed.color }}
-                      >
-                        {bed.label}
-                      </span>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {bedPresets.map((preset) => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => updateBed(bed.bedNumber, preset)}
-                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="h-4 w-4 rounded-full" style={{ backgroundColor: preset.color }} />
-                            <span className="text-sm font-semibold text-ink">{preset.label}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {visibleBeds.map(renderBedTile)}
               </div>
             </div>
-          )}
           </div>
         </div>
 
@@ -606,6 +517,62 @@ export const RoomStatusModal = ({
           </div>
         </div>
       </form>
-    </Modal>
+      </Modal>
+      <Modal
+        open={Boolean(editingBed)}
+        onClose={() => setEditingBedNumber(null)}
+        title={editingBed ? `Bed ${editingBed.bedNumber}` : 'Bed status'}
+        description="Choose how this bed should appear on the room board and in volunteer tasks."
+        panelClassName="max-w-md"
+      >
+        {editingBed ? (
+          <div className="grid gap-3">
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink">Current status</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Pick the next state for this bed.
+                  </p>
+                </div>
+                <span
+                  className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
+                  style={{ backgroundColor: editingBed.color }}
+                >
+                  {editingBed.label}
+                </span>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              {bedPresets.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    updateBed(editingBed.bedNumber, preset)
+                    setEditingBedNumber(null)
+                  }}
+                  className={`rounded-2xl border px-4 py-3 text-left transition ${
+                    editingBed.label === preset.label
+                      ? 'border-teal bg-teal/8 shadow-soft'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: preset.color }} />
+                    <span className="min-w-0 truncate text-sm font-semibold text-ink">{preset.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <Button type="button" variant="secondary" onClick={() => setEditingBedNumber(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+    </>
   )
 }

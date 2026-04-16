@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
+import { AlertTriangle, BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
@@ -13,7 +13,7 @@ import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
-import { CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
+import { BedConflict, CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 import { formatDateTime, formatTimeRange } from '../../utils/format'
 
 const sectionOrder = ['Arena Hostel', 'Arena Boutique / Seaview', 'Le Club']
@@ -44,12 +44,15 @@ const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceSta
     Boolean(activeCleaningTask)
 
   const badges: Array<{ label: string; color: string }> = []
+  const occupiedCount = customStatus?.beds.filter((bed) => normalizeLabel(bed.label) === 'occupied').length ?? 0
+  const needsMakingCount =
+    customStatus?.beds.filter((bed) => normalizeLabel(bed.label) === 'needs making').length ?? 0
 
   if (hasOccupied) {
-    badges.push({ label: 'Occupied', color: '#3b82f6' })
+    badges.push({ label: occupiedCount > 0 ? `${occupiedCount} Occupied` : 'Occupied', color: '#3b82f6' })
   }
   if (hasNeedsMaking) {
-    badges.push({ label: 'Needs making', color: '#ef4444' })
+    badges.push({ label: needsMakingCount > 0 ? `${needsMakingCount} Needs making` : 'Needs making', color: '#ef4444' })
   }
   if (hasCheck) {
     badges.push({ label: 'Check', color: '#f59e0b' })
@@ -68,6 +71,8 @@ const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceSta
     badges,
     beds: customStatus?.beds ?? [],
     roomType: customStatus?.roomType ?? room.roomType,
+    occupiedCount,
+    needsMakingCount,
   }
 }
 
@@ -75,6 +80,7 @@ export const AdminCleaningTasksPage = () => {
   const tasks = useAppStore((state) => state.tasks)
   const cleaningAreas = useAppStore((state) => state.cleaningAreas)
   const cleaningRooms = useAppStore((state) => state.cleaningRooms)
+  const bedConflicts = useAppStore((state) => state.bedConflicts)
   const cleaningPlaceStatuses = useAppStore((state) => state.cleaningPlaceStatuses)
   const createCleaningTask = useAppStore((state) => state.createCleaningTask)
   const updateCleaningTask = useAppStore((state) => state.updateCleaningTask)
@@ -89,6 +95,7 @@ export const AdminCleaningTasksPage = () => {
   const createCleaningRoom = useAppStore((state) => state.createCleaningRoom)
   const upsertCleaningPlaceStatus = useAppStore((state) => state.upsertCleaningPlaceStatus)
   const bulkCreateBedTasks = useAppStore((state) => state.bulkCreateBedTasks)
+  const resolveBedConflict = useAppStore((state) => state.resolveBedConflict)
   const cleaners = useCleanerUsers()
   const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
 
@@ -112,6 +119,7 @@ export const AdminCleaningTasksPage = () => {
   const [openTaskManageId, setOpenTaskManageId] = useState<string | null>(null)
   const [roomBoardOpen, setRoomBoardOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
+  const [bedConflictsOpen, setBedConflictsOpen] = useState(true)
   const [newRoom, setNewRoom] = useState<{
     code: string
     section: string
@@ -197,6 +205,22 @@ export const AdminCleaningTasksPage = () => {
         return { area, status }
       }),
     [cleaningAreas, cleaningPlaceStatuses, cleaningTasks],
+  )
+
+  const filteredBedConflicts = useMemo(
+    () =>
+      bedConflicts.filter((conflict) => {
+        const searchValue = search.trim().toLowerCase()
+        if (!searchValue) return true
+        return (
+          conflict.roomCode.toLowerCase().includes(searchValue) ||
+          conflict.roomLabel.toLowerCase().includes(searchValue) ||
+          String(conflict.bedNumber).includes(searchValue) ||
+          conflict.fromLabel.toLowerCase().includes(searchValue) ||
+          conflict.toLabel.toLowerCase().includes(searchValue)
+        )
+      }),
+    [bedConflicts, search],
   )
 
   const currentStatus = useMemo(() => {
@@ -563,6 +587,64 @@ export const AdminCleaningTasksPage = () => {
             </div>
           ))}
           </div>
+        ) : null}
+      </Panel>
+
+      <Panel className="p-6">
+        <div className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => setBedConflictsOpen((current) => !current)}
+            className="flex items-center gap-2 text-left"
+          >
+            <AlertTriangle size={18} className="text-amber-500" />
+            <h3 className="section-title">Bed conflicts</h3>
+            <span className={`rounded-2xl bg-slate-100 p-2 text-slate-500 transition ${bedConflictsOpen ? 'rotate-180' : ''}`}>
+              <ChevronDown size={16} />
+            </span>
+          </button>
+          <span className="text-sm text-slate-500">{filteredBedConflicts.length} active</span>
+        </div>
+        {bedConflictsOpen ? (
+          filteredBedConflicts.length ? (
+            <div className="mt-4 grid gap-3">
+              {filteredBedConflicts.map((conflict: BedConflict) => (
+                <div key={conflict.id} className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">
+                        {conflict.roomLabel} · Bed {conflict.bedNumber}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span className="rounded-full px-2.5 py-1 font-semibold text-white" style={{ backgroundColor: conflict.fromColor }}>
+                          {conflict.fromLabel}
+                        </span>
+                        <span className="text-slate-400">to</span>
+                        <span className="rounded-full px-2.5 py-1 font-semibold text-white" style={{ backgroundColor: conflict.toColor }}>
+                          {conflict.toLabel}
+                        </span>
+                        <span>{formatDateTime(conflict.createdAt)}</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        if (!window.confirm(`Resolve the conflict for ${conflict.roomLabel} bed ${conflict.bedNumber}?`)) return
+                        void resolveBedConflict(conflict.id)
+                      }}
+                    >
+                      Resolve
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 px-5 py-8 text-sm text-slate-500">
+              No bed conflicts are active right now.
+            </div>
+          )
         ) : null}
       </Panel>
 

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { toDateTimeLocal } from '../../utils/format'
+import { fromDateTimeLocal, toDateTimeLocal } from '../../utils/format'
 import {
   CleaningArea,
   CleaningRoom,
@@ -85,24 +85,27 @@ export const CleaningTaskEditorModal = ({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const scheduledAtIso = fromDateTimeLocal(form.scheduledAt)
+    const endsAtIso = fromDateTimeLocal(form.endsAt)
+    const publishAtIso = fromDateTimeLocal(form.publishAt)
 
-    if (!form.scheduledAt || !form.endsAt) {
+    if (!scheduledAtIso || !endsAtIso) {
       setScheduleError('Start and end date/time are required.')
       return
     }
 
-    if (new Date(form.endsAt).getTime() <= new Date(form.scheduledAt).getTime()) {
+    if (new Date(endsAtIso).getTime() <= new Date(scheduledAtIso).getTime()) {
       setScheduleError('End time must be later than start time.')
       return
     }
 
     if (publishMode === 'scheduled') {
-      if (!form.publishAt) {
+      if (!publishAtIso) {
         setScheduleError('Publish date and time are required when scheduling publication.')
         return
       }
 
-      if (new Date(form.publishAt).getTime() > new Date(form.scheduledAt).getTime()) {
+      if (new Date(publishAtIso).getTime() > new Date(scheduledAtIso).getTime()) {
         setScheduleError('Publish time must be before the task start time.')
         return
       }
@@ -110,12 +113,9 @@ export const CleaningTaskEditorModal = ({
 
     onSubmit({
       ...form,
-      publishAt:
-        publishMode === 'scheduled' && form.publishAt
-          ? new Date(form.publishAt).toISOString()
-          : undefined,
-      scheduledAt: new Date(form.scheduledAt).toISOString(),
-      endsAt: new Date(form.endsAt).toISOString(),
+      publishAt: publishMode === 'scheduled' ? publishAtIso : undefined,
+      scheduledAt: scheduledAtIso,
+      endsAt: endsAtIso,
     })
     onClose()
   }

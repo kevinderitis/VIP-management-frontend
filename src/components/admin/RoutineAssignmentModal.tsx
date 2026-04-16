@@ -1,18 +1,13 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { RoutineTaskTemplate, Weekday } from '../../types/models'
 import { useVolunteerUsers } from '../../store/app-store'
-import { formatWeekday } from '../../utils/format'
+import { formatWeekday, toLocalDateKey } from '../../utils/format'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 
 const weekdays: Weekday[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
-const toDateInput = (value = new Date()) => {
-  const date = new Date(value)
-  const offset = date.getTimezoneOffset()
-  const local = new Date(date.getTime() - offset * 60 * 1000)
-  return local.toISOString().slice(0, 10)
-}
+const toDateInput = (value = new Date()) => toLocalDateKey(value)
 
 export const RoutineAssignmentModal = ({
   open,

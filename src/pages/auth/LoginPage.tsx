@@ -26,7 +26,7 @@ export const LoginPage = () => {
     setIsSubmitting(true)
 
     try {
-      await login(identifier, password)
+      await login(identifier.trim().toLowerCase(), password)
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Could not sign in.')
     } finally {
@@ -140,8 +140,11 @@ export const LoginPage = () => {
                     <input
                       required
                       value={identifier}
-                      onChange={(event) => setIdentifier(event.target.value)}
+                      onChange={(event) => setIdentifier(event.target.value.toLowerCase())}
                       placeholder="Enter your username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       className="w-full border-0 bg-transparent p-0 text-base text-ink placeholder:text-slate-400 focus:outline-none focus:ring-0"
                     />
                   </div>

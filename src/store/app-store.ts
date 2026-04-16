@@ -5,6 +5,7 @@ import {
   ActivityItem,
   BulkBedTaskSelection,
   CleanerDraftInput,
+  BedConflict,
   CleaningArea,
   OfficeCall,
   CleaningPlaceStatus,
@@ -44,6 +45,7 @@ type ServerState = {
   redemptions: Redemption[]
   activities: ActivityItem[]
   officeCalls: OfficeCall[]
+  bedConflicts: BedConflict[]
 }
 
 type AppState = ServerState & {
@@ -86,6 +88,7 @@ type AppState = ServerState & {
     label: string
     color: string
   }) => Promise<void>
+  resolveBedConflict: (conflictId: string) => Promise<void>
   createCleaningTask: (input: CleaningTaskDraftInput) => Promise<void>
   updateCleaningTask: (taskId: string, input: CleaningTaskDraftInput) => Promise<void>
   publishCleaningTask: (taskId: string) => Promise<void>
@@ -144,6 +147,7 @@ const emptyServerState: ServerState = {
   redemptions: [],
   activities: [],
   officeCalls: [],
+  bedConflicts: [],
 }
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`
@@ -210,6 +214,7 @@ const mapTaskInput = (input: TaskDraftInput) => ({
   category: toApiEnum(input.category),
   priority: toApiEnum(input.priority),
   points: input.points,
+  volunteerSlots: input.volunteerSlots ?? 1,
   notes: input.notes || undefined,
   publishAt: input.publishAt || undefined,
   startsAt: input.scheduledAt || undefined,
@@ -746,6 +751,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       }))
     }
+  },
+
+  resolveBedConflict: async (conflictId) => {
+    await apiRequest(`/bed-conflicts/${conflictId}/resolve`, {
+      method: 'PATCH',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Conflict resolved', 'The bed conflict was removed from the active report.', 'info'),
+    }))
   },
 
   createCleaningTask: async (input) => {

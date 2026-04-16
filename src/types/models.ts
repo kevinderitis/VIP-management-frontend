@@ -71,6 +71,8 @@ export interface Task {
   createdBy: string
   notes?: string
   source: 'manual' | 'pack' | 'routine'
+  sharedTaskGroupId?: string
+  volunteerSlots?: number
   packId?: string
   packAssignmentId?: string
   routineTemplateId?: string
@@ -114,6 +116,20 @@ export interface CleaningPlaceStatus {
   roomServiceLabel?: string
   roomServiceColor?: string
   beds: BedStatus[]
+}
+
+export interface BedConflict {
+  id: string
+  roomCode: string
+  roomSection?: string
+  roomLabel: string
+  bedNumber: number
+  fromLabel: string
+  fromColor: string
+  toLabel: string
+  toColor: string
+  createdAt: string
+  resolvedAt?: string
 }
 
 export interface TaskGroupTemplate {
@@ -236,12 +252,21 @@ export interface ToastItem {
   tone: 'success' | 'info' | 'warning'
 }
 
+export interface BulkBedTaskSelection {
+  roomCode: string
+  roomSection?: string
+  roomType: RoomType
+  placeLabel: string
+  bedNumbers: number[]
+}
+
 export interface TaskDraftInput {
   title: string
   description: string
   category: TaskCategory
   priority: TaskPriority
   points: number
+  volunteerSlots?: number
   notes?: string
   publishAt?: string
   scheduledAt?: string
@@ -298,14 +323,6 @@ export interface CleaningPlaceStatusDraftInput {
   assignCleanerId?: string
   assignVolunteerId?: string
   applyVolunteerAssignment?: boolean
-}
-
-export interface BulkBedTaskSelection {
-  roomCode: string
-  roomSection: string
-  roomType: RoomType
-  placeLabel: string
-  bedNumbers: number[]
 }
 
 export interface RewardDraftInput {
