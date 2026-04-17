@@ -46,8 +46,18 @@ export const RoomStatusModal = ({
     lastAssignedTo?: string
     status: string
     bedTask?: boolean
+    roomTaskType?: string
   }>
-  onSubmit: (input: CleaningPlaceStatusDraftInput) => void
+  onSubmit: (
+    input: CleaningPlaceStatusDraftInput,
+    roomConfig: {
+      roomType: RoomType
+      bedCount: number
+      bedTaskPoints: number
+      checkTaskPoints: number
+      trashTaskPoints: number
+    },
+  ) => void | Promise<void>
 }) => {
   const initialBedCount = room.roomType === 'private' ? 1 : Math.max(2, room.bedCount, currentStatus?.beds.length ?? 0)
   const [roomType, setRoomType] = useState<RoomType>(currentStatus?.roomType ?? room.roomType)
@@ -56,6 +66,10 @@ export const RoomStatusModal = ({
   const [assignCleanerId, setAssignCleanerId] = useState('')
   const [assignVolunteerId, setAssignVolunteerId] = useState('')
   const [bedCount, setBedCount] = useState(initialBedCount)
+  const [bedTaskPoints, setBedTaskPoints] = useState(room.bedTaskPoints ?? 10)
+  const [checkTaskPoints, setCheckTaskPoints] = useState(room.checkTaskPoints ?? 10)
+  const [trashTaskPoints, setTrashTaskPoints] = useState(room.trashTaskPoints ?? 10)
+  const [trashRequested, setTrashRequested] = useState(false)
   const [beds, setBeds] = useState<BedStatus[]>(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
   const [showStructureSettings, setShowStructureSettings] = useState(false)
   const [editingBedNumber, setEditingBedNumber] = useState<number | null>(null)
@@ -70,6 +84,10 @@ export const RoomStatusModal = ({
     setAssignCleanerId('')
     setAssignVolunteerId('')
     setBedCount(room.roomType === 'private' ? 1 : Math.max(2, room.bedCount, currentStatus?.beds.length ?? 0))
+    setBedTaskPoints(room.bedTaskPoints ?? 10)
+    setCheckTaskPoints(room.checkTaskPoints ?? 10)
+    setTrashTaskPoints(room.trashTaskPoints ?? 10)
+    setTrashRequested(false)
     setBeds(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
     setShowStructureSettings(false)
     setEditingBedNumber(null)
@@ -123,7 +141,7 @@ export const RoomStatusModal = ({
   const hasBedsToAssign = visibleBeds.some((bed) => {
     const normalized = bed.label.toLowerCase()
     return normalized === 'needs making' || normalized === 'check'
-  })
+  }) || trashRequested
 
   useEffect(() => {
     if (editingBedNumber !== null && !visibleBeds.some((bed) => bed.bedNumber === editingBedNumber)) {
@@ -131,30 +149,42 @@ export const RoomStatusModal = ({
     }
   }, [editingBedNumber, visibleBeds])
 
-  const submitRoomSetup = () => {
+  const submitRoomSetup = async () => {
     const nextBeds = visibleBeds
-
-    onSubmit({
-      placeType: 'room',
-      roomCode: room.code,
-      roomSection: room.section,
-      roomType,
-      placeLabel: room.label,
-      label: roomLabel,
-      color: roomColor,
-      beds: nextBeds,
-      assignCleanerId: ['need cleaning', 'needs cleaning'].includes(roomLabel.trim().toLowerCase())
-        ? assignCleanerId || undefined
-        : undefined,
-      assignVolunteerId: hasBedsToAssign ? assignVolunteerId || undefined : undefined,
-      applyVolunteerAssignment: hasBedsToAssign,
-    })
     onClose()
+
+    await Promise.resolve(
+      onSubmit(
+        {
+          placeType: 'room',
+          roomCode: room.code,
+          roomSection: room.section,
+          roomType,
+          placeLabel: room.label,
+          label: roomLabel,
+          color: roomColor,
+          beds: nextBeds,
+          trashRequested,
+          assignCleanerId: ['need cleaning', 'needs cleaning'].includes(roomLabel.trim().toLowerCase())
+            ? assignCleanerId || undefined
+            : undefined,
+          assignVolunteerId: hasBedsToAssign ? assignVolunteerId || undefined : undefined,
+          applyVolunteerAssignment: hasBedsToAssign,
+        },
+        {
+          roomType,
+          bedCount: roomType === 'private' ? 1 : bedCount,
+          bedTaskPoints,
+          checkTaskPoints,
+          trashTaskPoints,
+        },
+      ),
+    )
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    submitRoomSetup()
+    void submitRoomSetup()
   }
 
   const handleMobileSave = () => {
@@ -163,7 +193,7 @@ export const RoomStatusModal = ({
       return
     }
 
-    submitRoomSetup()
+    void submitRoomSetup()
   }
 
   const editingBed = editingBedNumber !== null
@@ -215,8 +245,8 @@ export const RoomStatusModal = ({
       bodyClassName="mt-4 overflow-hidden"
       description={
         roomType === 'shared'
-          ? 'Shared rooms track each bed separately. Beds marked as Needs making or Check create or reactivate volunteer tasks.'
-          : 'Private rooms keep the room status plus an optional volunteer task for making or checking the bed.'
+          ? 'Shared rooms track each bed separately. Needs making, Check, and trash requests create or reactivate volunteer tasks.'
+          : 'Private rooms keep the room status plus optional volunteer tasks for bed work and trash pickup.'
       }
     >
       <form onSubmit={handleSubmit} className="grid h-full min-h-0 gap-4 grid-rows-[minmax(0,1fr)_auto] sm:gap-5 lg:h-[74vh] lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-1">
@@ -261,6 +291,42 @@ export const RoomStatusModal = ({
                       />
                     </label>
                   ) : null}
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="grid gap-2 text-sm font-medium text-ink">
+                      Bed points
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={bedTaskPoints}
+                        onChange={(event) => setBedTaskPoints(Number(event.target.value))}
+                        className="rounded-2xl border-slate-200"
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-ink">
+                      Check points
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={checkTaskPoints}
+                        onChange={(event) => setCheckTaskPoints(Number(event.target.value))}
+                        className="rounded-2xl border-slate-200"
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-ink">
+                      Trash points
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={trashTaskPoints}
+                        onChange={(event) => setTrashTaskPoints(Number(event.target.value))}
+                        className="rounded-2xl border-slate-200"
+                      />
+                    </label>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -310,6 +376,21 @@ export const RoomStatusModal = ({
                 </select>
               </label>
             ) : null}
+
+            <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={trashRequested}
+                onChange={(event) => setTrashRequested(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium">Take out trash</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  Creates a volunteer task for this room worth {trashTaskPoints} points.
+                </span>
+              </span>
+            </label>
 
             <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -377,6 +458,42 @@ export const RoomStatusModal = ({
                     />
                   </label>
                 ) : null}
+
+                <div className="grid gap-3">
+                  <label className="grid gap-2 text-sm font-medium text-ink">
+                    Bed points
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={bedTaskPoints}
+                      onChange={(event) => setBedTaskPoints(Number(event.target.value))}
+                      className="rounded-2xl border-slate-200"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-ink">
+                    Check points
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={checkTaskPoints}
+                      onChange={(event) => setCheckTaskPoints(Number(event.target.value))}
+                      className="rounded-2xl border-slate-200"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-ink">
+                    Trash points
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={trashTaskPoints}
+                      onChange={(event) => setTrashTaskPoints(Number(event.target.value))}
+                      className="rounded-2xl border-slate-200"
+                    />
+                  </label>
+                </div>
               </div>
             ) : null}
           </div>
@@ -454,9 +571,27 @@ export const RoomStatusModal = ({
             </label>
           ) : null}
 
+          <label className="grid gap-2 rounded-[24px] border border-slate-200 bg-white p-4 text-sm font-medium text-ink">
+            <span>Volunteer extras</span>
+            <span className="flex items-start gap-3 text-sm font-normal text-ink">
+              <input
+                type="checkbox"
+                checked={trashRequested}
+                onChange={(event) => setTrashRequested(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium">Take out trash</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  Creates a volunteer task for this room worth {trashTaskPoints} points.
+                </span>
+              </span>
+            </span>
+          </label>
+
           {hasBedsToAssign ? (
             <label className="grid gap-2 rounded-[24px] border border-slate-200 bg-white p-4 text-sm font-medium text-ink">
-              Assign all bed tasks to
+              Assign room tasks to
               <select
                 value={assignVolunteerId}
                 onChange={(event) => setAssignVolunteerId(event.target.value)}
@@ -470,7 +605,7 @@ export const RoomStatusModal = ({
                 ))}
               </select>
               <span className="text-xs font-normal text-slate-500">
-                Beds marked as Needs making or Check will be assigned separately to this volunteer. If left empty, they stay available for anyone to claim.
+                Beds marked as Needs making or Check, plus trash if requested, will be assigned separately to this volunteer. If left empty, they stay available for anyone to claim.
               </span>
             </label>
           ) : null}
@@ -488,7 +623,7 @@ export const RoomStatusModal = ({
         <div className="order-2 grid gap-3 border-t border-slate-200 bg-white pt-3 lg:hidden">
           {mobileVolunteerPromptOpen && hasBedsToAssign ? (
             <label className="grid gap-2 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-ink">
-              Assign selected bed tasks to
+              Assign room tasks to
               <select
                 value={assignVolunteerId}
                 onChange={(event) => setAssignVolunteerId(event.target.value)}
@@ -502,7 +637,7 @@ export const RoomStatusModal = ({
                 ))}
               </select>
               <span className="text-xs font-normal text-slate-500">
-                Beds marked as Needs making or Check will be assigned separately. If left empty, they stay available for anyone to claim.
+                Room tasks from Needs making, Check, and trash requests will be assigned separately. If left empty, they stay available for anyone to claim.
               </span>
             </label>
           ) : null}

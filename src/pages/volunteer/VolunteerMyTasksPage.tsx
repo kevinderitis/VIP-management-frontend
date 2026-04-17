@@ -28,6 +28,7 @@ export const VolunteerMyTasksPage = () => {
   const [filterMode, setFilterMode] = useState<'all' | 'today' | 'date'>('all')
   const [selectedDate, setSelectedDate] = useState(getLocalDateValue)
   const [pendingCompletionTask, setPendingCompletionTask] = useState<Task | null>(null)
+  const [pendingResultingBedState, setPendingResultingBedState] = useState<'READY' | 'OCCUPIED' | null>(null)
 
   const tasks = useMemo(
     () =>
@@ -111,10 +112,45 @@ export const VolunteerMyTasksPage = () => {
     [filteredTasks, routineAssignments, user?.id],
   )
 
+  const roomTaskGroups = useMemo(() => {
+    const groups = new Map<string, { roomLabel: string; tasks: Task[] }>()
+
+    standaloneTasks
+      .filter((task) => task.cleaningLocationType === 'room' && (task.cleaningRoomCode || task.cleaningRoomNumber))
+      .forEach((task) => {
+        const roomLabel = task.cleaningRoomCode
+          ? `Room ${task.cleaningRoomCode}`
+          : `Room ${task.cleaningRoomNumber}`
+        const key = task.cleaningRoomCode ?? String(task.cleaningRoomNumber)
+        const current = groups.get(key)
+
+        if (current) {
+          current.tasks.push(task)
+        } else {
+          groups.set(key, { roomLabel, tasks: [task] })
+        }
+      })
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      tasks: group.tasks.sort(
+        (left, right) =>
+          new Date(left.scheduledAt ?? left.publishedAt).getTime() -
+          new Date(right.scheduledAt ?? right.publishedAt).getTime(),
+      ),
+    }))
+  }, [standaloneTasks])
+
+  const nonRoomStandaloneTasks = useMemo(
+    () => standaloneTasks.filter((task) => task.cleaningLocationType !== 'room'),
+    [standaloneTasks],
+  )
+
   const handleCompleteTask = (task: Task) => {
     if (!user) return
     if (task.bedTask) {
       setPendingCompletionTask(task)
+      setPendingResultingBedState(null)
       return
     }
     void completeTask(task.id, user.id)
@@ -298,7 +334,66 @@ export const VolunteerMyTasksPage = () => {
                 </Panel>
               ))}
 
-              {standaloneTasks.map((task) => (
+              {roomTaskGroups.map((group) => (
+                <Panel key={group.roomLabel} className="overflow-hidden rounded-[24px]">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-4 p-4">
+                      <div className="rounded-2xl bg-gradient-to-br from-teal to-lagoon p-2.5 text-white shadow-float">
+                        <CalendarClock size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                            Room tasks
+                          </span>
+                        </div>
+                        <h3 className="mt-2 truncate font-display text-lg font-semibold text-ink">{group.roomLabel}</h3>
+                        <p className="mt-2 text-xs font-medium text-slate-500">
+                          {group.tasks.length} task{group.tasks.length > 1 ? 's' : ''} grouped in this room
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition group-open:rotate-180">
+                        <ChevronDown size={16} />
+                      </div>
+                    </summary>
+
+                    <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                      <div className="grid gap-3">
+                        {group.tasks.map((task) => (
+                          <div key={task.id} className="rounded-2xl bg-slate-50 px-4 py-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="font-semibold text-ink">{task.title}</p>
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {formatDateTime(task.scheduledAt ?? task.publishedAt)}
+                                </p>
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {formatTimeRange(task.scheduledAt ?? task.publishedAt, task.endsAt)}
+                                </p>
+                                <p className="mt-2 text-sm text-slate-500">{task.description}</p>
+                              </div>
+                              <div className="flex flex-col gap-2 sm:min-w-[180px]">
+                                {task.status === 'assigned' && user ? (
+                                  <Button size="sm" onClick={() => handleCompleteTask(task)}>
+                                    Mark as completed
+                                  </Button>
+                                ) : null}
+                                {user ? (
+                                  <Button variant="secondary" size="sm" onClick={() => releaseTask(task.id, user.id)}>
+                                    Release task
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </details>
+                </Panel>
+              ))}
+
+              {nonRoomStandaloneTasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -332,27 +427,45 @@ export const VolunteerMyTasksPage = () => {
       {pendingCompletionTask && user ? (
         <Modal
           open
-          onClose={() => setPendingCompletionTask(null)}
+          onClose={() => {
+            setPendingCompletionTask(null)
+            setPendingResultingBedState(null)
+          }}
           title="Set the final bed status"
           description={`Choose how ${pendingCompletionTask.cleaningBedNumber ? `bed ${pendingCompletionTask.cleaningBedNumber} in ${pendingCompletionTask.cleaningRoomCode ? `room ${pendingCompletionTask.cleaningRoomCode}` : `room ${pendingCompletionTask.cleaningRoomNumber}`}` : pendingCompletionTask.cleaningRoomCode ? `room ${pendingCompletionTask.cleaningRoomCode}` : `room ${pendingCompletionTask.cleaningRoomNumber}`} should appear after you complete this task.`}
         >
           <div className="grid gap-3">
-            <Button
-              onClick={() => {
-                void completeTask(pendingCompletionTask.id, user.id, 'READY')
-                setPendingCompletionTask(null)
-              }}
-            >
+            <Button onClick={() => setPendingResultingBedState('READY')}>
               Leave it ready
             </Button>
+            <Button variant="secondary" onClick={() => setPendingResultingBedState('OCCUPIED')}>
+              Mark it occupied
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {pendingCompletionTask && pendingResultingBedState && user ? (
+        <Modal
+          open
+          onClose={() => setPendingResultingBedState(null)}
+          title="Confirm final room status"
+          description={`Please confirm that ${
+            pendingResultingBedState === 'READY' ? 'ready' : 'occupied'
+          } is the correct final status for ${pendingCompletionTask.title}.`}
+        >
+          <div className="grid gap-3">
             <Button
-              variant="secondary"
               onClick={() => {
-                void completeTask(pendingCompletionTask.id, user.id, 'OCCUPIED')
+                void completeTask(pendingCompletionTask.id, user.id, pendingResultingBedState)
+                setPendingResultingBedState(null)
                 setPendingCompletionTask(null)
               }}
             >
-              Mark it occupied
+              Confirm {pendingResultingBedState === 'READY' ? 'ready' : 'occupied'}
+            </Button>
+            <Button variant="secondary" onClick={() => setPendingResultingBedState(null)}>
+              Go back
             </Button>
           </div>
         </Modal>

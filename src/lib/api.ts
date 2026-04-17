@@ -1,6 +1,16 @@
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
 const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, '')
 
+export class ApiError extends Error {
+  status?: number
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   token?: string
@@ -21,11 +31,17 @@ const buildHeaders = (token?: string) => {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
-    method: options.method ?? 'GET',
-    headers: buildHeaders(options.token),
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  })
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
+      method: options.method ?? 'GET',
+      headers: buildHeaders(options.token),
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    throw new ApiError('Could not reach the server. Please check your connection and try again.')
+  }
 
   if (!response.ok) {
     let message = 'Request failed'
@@ -48,7 +64,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
       message = response.statusText || message
     }
 
-    throw new Error(message)
+    throw new ApiError(message, response.status)
   }
 
   if (response.status === 204) {

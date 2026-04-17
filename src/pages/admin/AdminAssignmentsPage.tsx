@@ -148,7 +148,11 @@ export const AdminAssignmentsPage = () => {
           ['pack-assigned', 'routine-assigned'].includes(activity.type))
 
       const activityDate = isoDate(activity.createdAt)
-      const matchesVolunteer = volunteerFilter === 'all' || activity.description.includes(volunteerFilter)
+      const normalizedVolunteerFilter = volunteerFilter.toLowerCase()
+      const matchesVolunteer =
+        volunteerFilter === 'all' ||
+        activity.title.toLowerCase().includes(normalizedVolunteerFilter) ||
+        activity.description.toLowerCase().includes(normalizedVolunteerFilter)
       const matchesDate = !dateFilter || activityDate === dateFilter
       const matchesQuery =
         !query ||

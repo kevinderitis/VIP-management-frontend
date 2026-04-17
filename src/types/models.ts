@@ -28,6 +28,7 @@ export type TaskAudience = 'volunteer' | 'cleaning'
 export type CleaningLocationType = 'room' | 'custom'
 export type RoomType = 'private' | 'shared'
 export type BedState = 'ready' | 'needs-making' | 'check' | 'occupied'
+export type RoomTaskType = 'bed-making' | 'check' | 'trash'
 
 export interface BedStatus {
   bedNumber: number
@@ -84,6 +85,7 @@ export interface Task {
   cleaningRoomSection?: string
   cleaningBedNumber?: number
   bedTask?: boolean
+  roomTaskType?: RoomTaskType
 }
 
 export interface CleaningArea {
@@ -99,6 +101,9 @@ export interface CleaningRoom {
   label: string
   roomType: RoomType
   bedCount: number
+  bedTaskPoints: number
+  checkTaskPoints: number
+  trashTaskPoints: number
   isActive: boolean
 }
 
@@ -115,6 +120,7 @@ export interface CleaningPlaceStatus {
   color: string
   roomServiceLabel?: string
   roomServiceColor?: string
+  trashRequested?: boolean
   beds: BedStatus[]
 }
 
@@ -320,6 +326,7 @@ export interface CleaningPlaceStatusDraftInput {
   label: string
   color: string
   beds?: BedStatus[]
+  trashRequested?: boolean
   assignCleanerId?: string
   assignVolunteerId?: string
   applyVolunteerAssignment?: boolean

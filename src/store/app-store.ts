@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
-import { apiRequest } from '../lib/api'
+import { ApiError, apiRequest } from '../lib/api'
 import {
   ActivityItem,
   BulkBedTaskSelection,
@@ -80,7 +80,25 @@ type AppState = ServerState & {
   updateCleaningArea: (areaId: string, name: string) => Promise<void>
   toggleCleaningArea: (areaId: string) => Promise<void>
   deleteCleaningArea: (areaId: string) => Promise<void>
-  createCleaningRoom: (input: { code: string; section: string; roomType: 'private' | 'shared'; bedCount: number }) => Promise<void>
+  createCleaningRoom: (input: {
+    code: string
+    section: string
+    roomType: 'private' | 'shared'
+    bedCount: number
+    bedTaskPoints?: number
+    checkTaskPoints?: number
+    trashTaskPoints?: number
+  }) => Promise<void>
+  updateCleaningRoom: (roomId: string, input: {
+    code: string
+    section: string
+    roomType: 'private' | 'shared'
+    bedCount: number
+    bedTaskPoints?: number
+    checkTaskPoints?: number
+    trashTaskPoints?: number
+    isActive?: boolean
+  }) => Promise<void>
   upsertCleaningPlaceStatus: (input: CleaningPlaceStatusDraftInput) => Promise<void>
   bulkCreateBedTasks: (input: {
     selections: BulkBedTaskSelection[]
@@ -258,6 +276,7 @@ const mapCleaningPlaceStatusInput = (input: CleaningPlaceStatusDraftInput) => ({
   placeLabel: input.placeLabel,
   label: input.label,
   color: input.color,
+  trashRequested: input.trashRequested,
   beds: input.beds?.map((bed) => ({
     bedNumber: bed.bedNumber,
     label: bed.label,
@@ -334,15 +353,29 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...normalizeServerState(payload),
       }))
     } catch (error) {
-      persistSession(undefined, undefined)
+      const status = error instanceof ApiError ? error.status : undefined
+
+      if (status === 401 || status === 403) {
+        persistSession(undefined, undefined)
+        set((state) => ({
+          ...emptyServerState,
+          accessToken: undefined,
+          sessionUserId: undefined,
+          toasts: addToast(
+            state.toasts,
+            'Session expired',
+            error instanceof Error ? error.message : 'Please sign in again.',
+            'warning',
+          ),
+        }))
+        return
+      }
+
       set((state) => ({
-        ...emptyServerState,
-        accessToken: undefined,
-        sessionUserId: undefined,
         toasts: addToast(
           state.toasts,
-          'Session expired',
-          error instanceof Error ? error.message : 'Please sign in again.',
+          'Connection issue',
+          error instanceof Error ? error.message : 'Could not refresh the workspace. Retrying soon.',
           'warning',
         ),
       }))
@@ -682,11 +715,35 @@ export const useAppStore = create<AppState>((set, get) => ({
         section: input.section,
         roomType: toApiEnum(input.roomType),
         bedCount: input.bedCount,
+        bedTaskPoints: input.bedTaskPoints ?? 10,
+        checkTaskPoints: input.checkTaskPoints ?? 10,
+        trashTaskPoints: input.trashTaskPoints ?? 10,
       },
     })
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Room added', 'The room now appears on the cleaning board.'),
+    }))
+  },
+
+  updateCleaningRoom: async (roomId, input) => {
+    await apiRequest(`/cleaning-rooms/${roomId}`, {
+      method: 'PUT',
+      token: get().accessToken,
+      body: {
+        code: input.code,
+        section: input.section,
+        roomType: toApiEnum(input.roomType),
+        bedCount: input.bedCount,
+        bedTaskPoints: input.bedTaskPoints ?? 10,
+        checkTaskPoints: input.checkTaskPoints ?? 10,
+        trashTaskPoints: input.trashTaskPoints ?? 10,
+        isActive: input.isActive,
+      },
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Room updated', 'Room setup and future task points were saved.', 'info'),
     }))
   },
 

@@ -26,7 +26,7 @@ const normalizeLabel = (value?: string) => value?.trim().toLowerCase() ?? ''
 const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceStatus | undefined, relatedTasks: Task[]) => {
   const activeTasks = relatedTasks.filter((task) => activeTaskStatuses.includes(task.status))
   const activeBedTasks = activeTasks.filter((task) => task.bedTask)
-  const activeCleaningTask = activeTasks.find((task) => !task.bedTask)
+  const activeCleaningTask = activeTasks.find((task) => task.audience === 'cleaning')
 
   const bedLabels = customStatus?.beds.map((bed) => normalizeLabel(bed.label)) ?? []
   const roomServiceLabel = normalizeLabel(customStatus?.roomServiceLabel)
@@ -93,6 +93,7 @@ export const AdminCleaningTasksPage = () => {
   const toggleCleaningArea = useAppStore((state) => state.toggleCleaningArea)
   const deleteCleaningArea = useAppStore((state) => state.deleteCleaningArea)
   const createCleaningRoom = useAppStore((state) => state.createCleaningRoom)
+  const updateCleaningRoom = useAppStore((state) => state.updateCleaningRoom)
   const upsertCleaningPlaceStatus = useAppStore((state) => state.upsertCleaningPlaceStatus)
   const bulkCreateBedTasks = useAppStore((state) => state.bulkCreateBedTasks)
   const resolveBedConflict = useAppStore((state) => state.resolveBedConflict)
@@ -856,7 +857,19 @@ export const AdminCleaningTasksPage = () => {
           cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
           volunteers={volunteers}
           roomTasks={tasks.filter((task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === selectedRoom.code)}
-          onSubmit={(input) => void upsertCleaningPlaceStatus(input)}
+          onSubmit={async (input, roomConfig) => {
+            await updateCleaningRoom(selectedRoom.id, {
+              code: selectedRoom.code,
+              section: selectedRoom.section,
+              roomType: roomConfig.roomType,
+              bedCount: roomConfig.bedCount,
+              bedTaskPoints: roomConfig.bedTaskPoints,
+              checkTaskPoints: roomConfig.checkTaskPoints,
+              trashTaskPoints: roomConfig.trashTaskPoints,
+              isActive: selectedRoom.isActive,
+            })
+            await upsertCleaningPlaceStatus(input)
+          }}
         />
       ) : null}
 
