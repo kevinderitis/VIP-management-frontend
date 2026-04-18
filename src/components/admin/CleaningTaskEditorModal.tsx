@@ -154,7 +154,7 @@ export const CleaningTaskEditorModal = ({
               <input
                 type="datetime-local"
                 required
-                value={form.publishAt ? toDateTimeLocal(form.publishAt) : ''}
+                value={form.publishAt ?? ''}
                 onChange={(event) => setForm((prev) => ({ ...prev, publishAt: event.target.value }))}
                 className="rounded-2xl border-slate-200"
               />
@@ -292,7 +292,7 @@ export const CleaningTaskEditorModal = ({
             <input
               type="datetime-local"
               required
-              value={form.scheduledAt ? toDateTimeLocal(form.scheduledAt) : ''}
+              value={form.scheduledAt ?? ''}
               onChange={(event) => setForm((prev) => ({ ...prev, scheduledAt: event.target.value }))}
               className="rounded-2xl border-slate-200"
             />
@@ -302,7 +302,7 @@ export const CleaningTaskEditorModal = ({
             <input
               type="datetime-local"
               required
-              value={form.endsAt ? toDateTimeLocal(form.endsAt) : ''}
+              value={form.endsAt ?? ''}
               onChange={(event) => setForm((prev) => ({ ...prev, endsAt: event.target.value }))}
               className="rounded-2xl border-slate-200"
             />
