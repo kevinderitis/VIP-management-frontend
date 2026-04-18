@@ -104,6 +104,7 @@ export const AdminCleaningTasksPage = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [roomTypeFilter, setRoomTypeFilter] = useState<'all' | 'private' | 'shared'>('all')
   const [sectionFilter, setSectionFilter] = useState<'all' | string>('all')
+  const [hideCleanRooms, setHideCleanRooms] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [areaOpen, setAreaOpen] = useState(false)
@@ -182,11 +183,12 @@ export const AdminCleaningTasksPage = () => {
           const derivedStatus = deriveRoomBoardState(room, customStatus, relatedTasks)
 
           return { room, status: derivedStatus }
-        }),
+        })
+        .filter(({ status }) => !hideCleanRooms || status.primaryLabel !== 'Clean'),
     }))
 
     return grouped.filter((group) => group.rooms.length > 0)
-  }, [cleaningPlaceStatuses, cleaningRooms, roomTypeFilter, search, sectionFilter, tasks])
+  }, [cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomTypeFilter, search, sectionFilter, tasks])
 
   const customPlaceCards = useMemo(
     () =>
@@ -342,74 +344,40 @@ export const AdminCleaningTasksPage = () => {
               Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
             </p>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-[auto_auto] lg:items-start lg:justify-between">
-          <div className="grid gap-3 sm:hidden">
-            <select
-              value={roomTypeFilter}
-              onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')}
-              className="w-full rounded-2xl border-slate-200"
-            >
-              <option value="all">All rooms</option>
-              <option value="private">Private only</option>
-              <option value="shared">Shared only</option>
-            </select>
-            <select
-              value={sectionFilter}
-              onChange={(event) => setSectionFilter(event.target.value)}
-              className="w-full rounded-2xl border-slate-200"
-            >
-              <option value="all">All locations</option>
-              {sectionOrder.map((section) => (
-                <option key={section} value={section}>
-                  {section}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="hidden flex-wrap gap-2 sm:flex">
-            <Button
-              size="sm"
-              variant={roomTypeFilter === 'all' ? 'primary' : 'secondary'}
-              onClick={() => setRoomTypeFilter('all')}
-            >
-              All rooms
-            </Button>
-            <Button
-              size="sm"
-              variant={roomTypeFilter === 'private' ? 'primary' : 'secondary'}
-              onClick={() => setRoomTypeFilter('private')}
-            >
-              Private only
-            </Button>
-            <Button
-              size="sm"
-              variant={roomTypeFilter === 'shared' ? 'primary' : 'secondary'}
-              onClick={() => setRoomTypeFilter('shared')}
-            >
-              Shared only
-            </Button>
-          </div>
-
-          <div className="hidden flex-wrap gap-2 sm:flex">
-            <Button
-              size="sm"
-              variant={sectionFilter === 'all' ? 'primary' : 'secondary'}
-              onClick={() => setSectionFilter('all')}
-            >
-              All locations
-            </Button>
-            {sectionOrder.map((section) => (
-              <Button
-                key={section}
-                size="sm"
-                variant={sectionFilter === section ? 'primary' : 'secondary'}
-                onClick={() => setSectionFilter(section)}
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,240px)_auto] lg:items-start lg:justify-between">
+              <select
+                value={roomTypeFilter}
+                onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')}
+                className="w-full rounded-2xl border-slate-200"
               >
-                {section}
-              </Button>
-            ))}
-          </div>
+                <option value="all">All rooms</option>
+                <option value="private">Private only</option>
+                <option value="shared">Shared only</option>
+              </select>
+
+              <select
+                value={sectionFilter}
+                onChange={(event) => setSectionFilter(event.target.value)}
+                className="w-full rounded-2xl border-slate-200"
+              >
+                <option value="all">All locations</option>
+                {sectionOrder.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                <Button
+                  size="sm"
+                  variant={hideCleanRooms ? 'primary' : 'secondary'}
+                  onClick={() => setHideCleanRooms((current) => !current)}
+                  className="w-full sm:w-auto"
+                >
+                  {hideCleanRooms ? 'Showing clean rooms' : 'Hide clean rooms'}
+                </Button>
+              </div>
             </div>
 
             <div className="mt-6 grid gap-6">
