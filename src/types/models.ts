@@ -195,8 +195,13 @@ export interface TaskCompletionRecord {
   id: string
   taskId: string
   volunteerId: string
+  taskTitle: string
+  taskDescription?: string
   completedAt: string
   points: number
+  status: 'completed' | 'cancelled'
+  reversedAt?: string
+  reversedBy?: string
   source: Task['source']
   routineTemplateId?: string
   packId?: string
@@ -219,7 +224,9 @@ export interface Redemption {
   volunteerId: string
   createdAt: string
   cost: number
-  status: 'completed'
+  status: 'completed' | 'delivered'
+  deliveredAt?: string
+  deliveredBy?: string
 }
 
 export interface OfficeCall {

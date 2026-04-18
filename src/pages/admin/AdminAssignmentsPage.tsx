@@ -3,10 +3,11 @@ import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound, UserP
 import { RoutineAssignmentReassignModal } from '../../components/admin/RoutineAssignmentReassignModal'
 import { TaskAssignmentModal } from '../../components/admin/TaskAssignmentModal'
 import { Button } from '../../components/common/Button'
+import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore } from '../../store/app-store'
-import { Task } from '../../types/models'
+import { Task, TaskCompletionRecord } from '../../types/models'
 import { formatDate, formatDateTime, formatTimeRange, formatWeekday } from '../../utils/format'
 
 type AssignmentRow = {
@@ -41,10 +42,12 @@ export const AdminAssignmentsPage = () => {
   const routineTasks = useAppStore((state) => state.routineTasks)
   const routineAssignments = useAppStore((state) => state.routineAssignments)
   const activities = useAppStore((state) => state.activities)
+  const taskHistory = useAppStore((state) => state.taskHistory)
   const deleteRoutineAssignment = useAppStore((state) => state.deleteRoutineAssignment)
   const reassignRoutineAssignment = useAppStore((state) => state.reassignRoutineAssignment)
   const assignTask = useAppStore((state) => state.assignTask)
   const unassignTask = useAppStore((state) => state.unassignTask)
+  const revertTaskCompletion = useAppStore((state) => state.revertTaskCompletion)
 
   const volunteers = useMemo(
     () => users.filter((user) => user.role === 'volunteer').sort((left, right) => left.name.localeCompare(right.name)),
@@ -55,12 +58,16 @@ export const AdminAssignmentsPage = () => {
   const [dateFilter, setDateFilter] = useState('')
   const [volunteerFilter, setVolunteerFilter] = useState('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<'all' | 'manual' | 'recurring'>('all')
+  const [completionStatusFilter, setCompletionStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all')
   const [page, setPage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
+  const [completionPage, setCompletionPage] = useState(1)
   const [manualAssignmentTask, setManualAssignmentTask] = useState<Task | null>(null)
   const [recurringAssignmentRow, setRecurringAssignmentRow] = useState<AssignmentRow | null>(null)
+  const [completionToRevert, setCompletionToRevert] = useState<TaskCompletionRecord | null>(null)
   const pageSize = 12
   const historyPageSize = 8
+  const completionPageSize = 10
 
   const assignmentRows = useMemo<AssignmentRow[]>(() => {
     const manualAssignments: AssignmentRow[] = tasks
@@ -163,6 +170,31 @@ export const AdminAssignmentsPage = () => {
     })
   }, [activities, dateFilter, search, taskTypeFilter, volunteerFilter])
 
+  const completionRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return taskHistory.filter((entry) => {
+      const task = tasks.find((item) => item.id === entry.taskId)
+      const volunteer = users.find((user) => user.id === entry.volunteerId)
+
+      const matchesType =
+        taskTypeFilter === 'all' ||
+        (taskTypeFilter === 'manual' && entry.source === 'manual') ||
+        (taskTypeFilter === 'recurring' && entry.source === 'routine')
+      const matchesVolunteer = volunteerFilter === 'all' || volunteer?.name === volunteerFilter
+      const matchesDate = !dateFilter || isoDate(entry.completedAt) === dateFilter
+      const matchesStatus = completionStatusFilter === 'all' || entry.status === completionStatusFilter
+      const matchesQuery =
+        !query ||
+        entry.taskTitle.toLowerCase().includes(query) ||
+        (entry.taskDescription ?? '').toLowerCase().includes(query) ||
+        (volunteer?.name ?? '').toLowerCase().includes(query) ||
+        (task?.cleaningRoomCode ?? '').toLowerCase().includes(query)
+
+      return matchesType && matchesVolunteer && matchesDate && matchesStatus && matchesQuery
+    })
+  }, [completionStatusFilter, dateFilter, search, taskHistory, taskTypeFilter, tasks, users, volunteerFilter])
+
   useEffect(() => {
     setPage(1)
   }, [dateFilter, search, taskTypeFilter, volunteerFilter])
@@ -171,6 +203,10 @@ export const AdminAssignmentsPage = () => {
     setHistoryPage(1)
   }, [dateFilter, search, taskTypeFilter, volunteerFilter])
 
+  useEffect(() => {
+    setCompletionPage(1)
+  }, [completionStatusFilter, dateFilter, search, taskTypeFilter, volunteerFilter])
+
   const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize))
   const paginatedAssignments = filteredAssignments.slice((page - 1) * pageSize, page * pageSize)
 
@@ -178,6 +214,11 @@ export const AdminAssignmentsPage = () => {
   const paginatedHistory = assignmentHistory.slice(
     (historyPage - 1) * historyPageSize,
     historyPage * historyPageSize,
+  )
+  const completionPages = Math.max(1, Math.ceil(completionRows.length / completionPageSize))
+  const paginatedCompletions = completionRows.slice(
+    (completionPage - 1) * completionPageSize,
+    completionPage * completionPageSize,
   )
 
   return (
@@ -189,7 +230,7 @@ export const AdminAssignmentsPage = () => {
       />
 
       <Panel className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_220px]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_220px_220px]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -236,6 +277,19 @@ export const AdminAssignmentsPage = () => {
                   {volunteer.name}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Completion status
+            <select
+              value={completionStatusFilter}
+              onChange={(event) => setCompletionStatusFilter(event.target.value as 'all' | 'completed' | 'cancelled')}
+              className="rounded-2xl border-slate-200"
+            >
+              <option value="all">All completion states</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </label>
         </div>
@@ -361,6 +415,80 @@ export const AdminAssignmentsPage = () => {
         ) : null}
       </Panel>
 
+      <Panel className="p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <CalendarRange size={18} className="text-amber-600" />
+            <h3 className="section-title">Completed task log</h3>
+          </div>
+          <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
+            {completionRows.length} result{completionRows.length === 1 ? '' : 's'} · Page {completionPage} of {completionPages}
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {paginatedCompletions.length ? (
+            paginatedCompletions.map((entry) => {
+              const volunteer = users.find((user) => user.id === entry.volunteerId)
+              const task = tasks.find((item) => item.id === entry.taskId)
+
+              return (
+                <div key={entry.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-xl font-semibold text-ink">{entry.taskTitle}</p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {volunteer?.name ?? 'Unknown volunteer'} · {formatDateTime(entry.completedAt)}
+                      </p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {entry.taskDescription ?? task?.description ?? 'Task details archived from the live board.'}
+                      </p>
+                    </div>
+
+                    {entry.status !== 'cancelled' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCompletionToRevert(entry)}
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Revert
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <span className="rounded-full bg-white px-3 py-1">{entry.points} pts</span>
+                    <span className={`rounded-full px-3 py-1 ${entry.status === 'cancelled' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {entry.status}
+                    </span>
+                    {task?.status && task.status !== entry.status ? (
+                      <span className="rounded-full bg-white px-3 py-1">{task.status}</span>
+                    ) : null}
+                    {entry.reversedAt ? <span className="rounded-full bg-white px-3 py-1">Reverted {formatDateTime(entry.reversedAt)}</span> : null}
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+              No completed tasks match these filters.
+            </div>
+          )}
+        </div>
+
+        {completionPages > 1 ? (
+          <div className="mt-5 flex justify-end gap-2">
+            <Button size="sm" variant="secondary" disabled={completionPage === 1} onClick={() => setCompletionPage((current) => Math.max(1, current - 1))}>
+              Previous
+            </Button>
+            <Button size="sm" variant="secondary" disabled={completionPage === completionPages} onClick={() => setCompletionPage((current) => Math.min(completionPages, current + 1))}>
+              Next
+            </Button>
+          </div>
+        ) : null}
+      </Panel>
+
       <Panel className="bg-admin p-6 text-white">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -426,6 +554,42 @@ export const AdminAssignmentsPage = () => {
           void reassignRoutineAssignment(recurringAssignmentRow.removeId, volunteerId)
         }}
       />
+
+      <Modal
+        open={Boolean(completionToRevert)}
+        onClose={() => setCompletionToRevert(null)}
+        title="Revert task completion"
+        description="This will remove the granted points and mark the task completion as cancelled in the history."
+        panelClassName="max-w-lg"
+      >
+        <div className="grid gap-4">
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="font-semibold text-ink">{completionToRevert?.taskTitle}</p>
+            <p className="mt-1">
+              {users.find((user) => user.id === completionToRevert?.volunteerId)?.name ?? 'Volunteer'} ·{' '}
+              {completionToRevert?.points ?? 0} pts
+            </p>
+            <p className="mt-1">
+              Completed on {completionToRevert ? formatDateTime(completionToRevert.completedAt) : ''}
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setCompletionToRevert(null)}>
+              Keep completion
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!completionToRevert) return
+                void revertTaskCompletion(completionToRevert.id)
+                setCompletionToRevert(null)
+              }}
+            >
+              Revert points
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

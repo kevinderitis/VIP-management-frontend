@@ -68,6 +68,7 @@ type AppState = ServerState & {
   takeTask: (taskId: string, volunteerId: string) => Promise<void>
   releaseTask: (taskId: string, volunteerId: string) => Promise<void>
   completeTask: (taskId: string, volunteerId: string, resultingBedState?: 'READY' | 'OCCUPIED') => Promise<void>
+  revertTaskCompletion: (completionId: string) => Promise<void>
   createVolunteer: (input: VolunteerDraftInput) => Promise<void>
   updateVolunteer: (userId: string, input: VolunteerDraftInput) => Promise<void>
   toggleVolunteer: (userId: string) => Promise<void>
@@ -121,6 +122,7 @@ type AppState = ServerState & {
   toggleReward: (rewardId: string) => Promise<void>
   deleteReward: (rewardId: string) => Promise<void>
   redeemReward: (rewardId: string, volunteerId: string) => Promise<void>
+  confirmRewardDelivered: (redemptionId: string) => Promise<void>
   createGroup: (input: TaskGroupDraftInput) => Promise<void>
   updateGroup: (groupId: string, input: TaskGroupDraftInput) => Promise<void>
   toggleGroup: (groupId: string) => Promise<void>
@@ -539,6 +541,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Task completed', 'Your points were credited successfully.'),
+    }))
+  },
+
+  revertTaskCompletion: async (completionId) => {
+    await apiRequest(`/tasks/completions/${completionId}/revert`, {
+      method: 'POST',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Completion reverted', 'The awarded points were removed and the task was marked as cancelled.', 'warning'),
     }))
   },
 
@@ -995,6 +1008,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Reward redeemed', 'The reward was taken instantly and the stock was updated.'),
+    }))
+  },
+
+  confirmRewardDelivered: async (redemptionId) => {
+    await apiRequest(`/rewards/redemptions/${redemptionId}/confirm-delivered`, {
+      method: 'POST',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Delivery confirmed', 'The redemption was marked as delivered.', 'info'),
     }))
   },
 

@@ -22,6 +22,7 @@ export const AdminTasksPage = () => {
   const assignTask = useAppStore((state) => state.assignTask)
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [hideRoomTasks, setHideRoomTasks] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -31,6 +32,10 @@ export const AdminTasksPage = () => {
   const filteredTasks = useMemo(() => {
     const visibleTasks = tasks.filter((task) => {
       if (task.audience !== 'volunteer') {
+        return false
+      }
+
+      if (hideRoomTasks && (task.roomTaskType || task.bedTask || task.cleaningRoomCode)) {
         return false
       }
 
@@ -101,7 +106,12 @@ export const AdminTasksPage = () => {
         volunteerSlots: totalSlots,
         assignedCount,
       }))
-  }, [search, statusFilter, tasks])
+      .sort(
+        (left, right) =>
+          new Date(right.publishedAt ?? right.scheduledAt ?? 0).getTime() -
+          new Date(left.publishedAt ?? left.scheduledAt ?? 0).getTime(),
+      )
+  }, [hideRoomTasks, search, statusFilter, tasks])
 
   return (
     <div className="grid gap-6">
@@ -122,7 +132,7 @@ export const AdminTasksPage = () => {
         }
       />
       <Panel className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_200px]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_auto]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -145,6 +155,13 @@ export const AdminTasksPage = () => {
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
+          <Button
+            type="button"
+            variant={hideRoomTasks ? 'secondary' : 'ghost'}
+            onClick={() => setHideRoomTasks((current) => !current)}
+          >
+            {hideRoomTasks ? 'Show room tasks' : 'Hide room tasks'}
+          </Button>
         </div>
       </Panel>
 
