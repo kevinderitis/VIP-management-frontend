@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { API_BASE_URL } from '../lib/api'
 import { useAppStore, useSessionUser } from '../store/app-store'
-import { showAppNotification } from '../utils/notifications'
+import { shouldUseWebPushOnly, showAppNotification } from '../utils/notifications'
 
 const socketBaseUrl = API_BASE_URL.replace(/\/api$/, '')
 
@@ -40,6 +40,7 @@ export const useOfficeCallNotifications = () => {
       seenCallIdsRef.current = []
       return
     }
+    if (shouldUseWebPushOnly()) return
 
     const newCalls = officeCalls.filter((call) => !seenCallIdsRef.current.includes(call.id))
     seenCallIdsRef.current = officeCalls.map((call) => call.id)

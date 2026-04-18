@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { NotificationPermissionBanner } from './components/common/NotificationPermissionBanner'
 import { ToastViewport } from './components/common/ToastViewport'
 import { useOfficeCallNotifications } from './hooks/useOfficeCallNotifications'
 import { usePwaNotifications } from './hooks/usePwaNotifications'
@@ -10,9 +11,9 @@ import { useAppStore } from './store/app-store'
 function App() {
   const initializeApp = useAppStore((state) => state.initializeApp)
   const isReady = useAppStore((state) => state.isReady)
+  const pwaNotifications = usePwaNotifications()
 
   useRealtimeSimulation()
-  usePwaNotifications()
   useTaskNotifications()
   useOfficeCallNotifications()
 
@@ -35,6 +36,12 @@ function App() {
   return (
     <>
       <AppRouter />
+      <NotificationPermissionBanner
+        open={pwaNotifications.canShowPrompt}
+        isDenied={pwaNotifications.isDenied}
+        isBusy={pwaNotifications.isEnabling}
+        onEnable={pwaNotifications.enableNotifications}
+      />
       <ToastViewport />
     </>
   )

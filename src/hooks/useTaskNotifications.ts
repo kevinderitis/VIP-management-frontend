@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore, useSessionUser } from '../store/app-store'
 import { formatDateTime } from '../utils/format'
-import { showAppNotification } from '../utils/notifications'
+import { shouldUseWebPushOnly, showAppNotification } from '../utils/notifications'
 
 export const useTaskNotifications = () => {
   const user = useSessionUser()
@@ -14,6 +14,7 @@ export const useTaskNotifications = () => {
 
   useEffect(() => {
     if (!user) return
+    if (shouldUseWebPushOnly()) return
 
     const currentTasks = tasks
       .filter(
