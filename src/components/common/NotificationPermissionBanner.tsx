@@ -36,20 +36,25 @@ export const NotificationPermissionBanner = ({
             <BellRing size={18} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-ink">Enable notifications</p>
+            <p className="font-semibold text-ink">
+              {isDenied ? 'Notifications are blocked' : 'Enable notifications'}
+            </p>
             <p className="mt-1 text-sm text-slate-600">
-              Get office calls and task alerts even when the app is closed.
+              {isDenied
+                ? 'To receive alerts, enable notifications from your browser or app settings.'
+                : 'Get office calls and task alerts even when the app is closed.'}
             </p>
             {isDenied ? (
               <p className="mt-2 text-xs text-amber-700">
-                Notifications are currently blocked. Tap the button again after enabling them in your browser or system settings.
+                On iPhone, open Settings, find this app or Safari website settings, and allow notifications there.
               </p>
-            ) : null}
-            <div className="mt-3">
-              <Button type="button" size="sm" onClick={() => void onEnable()} disabled={isBusy}>
-                {isBusy ? 'Enabling...' : 'Enable notifications'}
-              </Button>
-            </div>
+            ) : (
+              <div className="mt-3">
+                <Button type="button" size="sm" onClick={() => void onEnable()} disabled={isBusy}>
+                  {isBusy ? 'Enabling...' : 'Enable notifications'}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
