@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { BellRing } from 'lucide-react'
 import { Button } from './Button'
 
@@ -12,11 +13,24 @@ export const NotificationPermissionBanner = ({
   isBusy: boolean
   onEnable: () => void | Promise<void>
 }) => {
-  if (!open) return null
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setVisible(false)
+      return undefined
+    }
+
+    setVisible(true)
+    const timeout = window.setTimeout(() => setVisible(false), 9000)
+    return () => window.clearTimeout(timeout)
+  }, [open])
+
+  if (!open || !visible) return null
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-[70] sm:inset-x-auto sm:right-4 sm:w-[360px]">
-      <div className="rounded-[28px] border border-teal/20 bg-white/96 p-4 shadow-soft backdrop-blur">
+    <div className="pointer-events-none fixed inset-x-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[70] flex justify-center sm:inset-x-auto sm:right-4 sm:top-4 sm:block sm:w-[360px]">
+      <div className="pointer-events-auto w-full max-w-[420px] rounded-[28px] border border-teal/20 bg-white/96 p-4 shadow-soft backdrop-blur">
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-teal/10 p-2 text-teal">
             <BellRing size={18} />
