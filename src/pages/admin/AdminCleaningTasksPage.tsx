@@ -910,9 +910,10 @@ export const AdminCleaningTasksPage = () => {
               <input
                 type="number"
                 min={1}
-                max={14}
                 value={newRoom.roomType === 'private' ? 1 : newRoom.bedCount}
-                onChange={(event) => setNewRoom((current) => ({ ...current, bedCount: Number(event.target.value) }))}
+                onChange={(event) =>
+                  setNewRoom((current) => ({ ...current, bedCount: Math.max(1, Number(event.target.value) || 1) }))
+                }
                 className="rounded-2xl border-slate-200"
                 disabled={newRoom.roomType === 'private'}
               />

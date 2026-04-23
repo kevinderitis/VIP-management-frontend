@@ -19,7 +19,7 @@ export const AdminLayout = () => {
   const user = useSessionUser()
   const logout = useAppStore((state) => state.logout)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
   return (
     <div className="min-h-screen bg-shell">
@@ -55,13 +55,7 @@ export const AdminLayout = () => {
                 </div>
               </div>
             ) : (
-              <>
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
-                <h1 className="mt-3 font-display text-3xl font-semibold">Hostel Control Hub</h1>
-                <p className="mt-3 text-sm text-white/70">
-                  Operations, volunteers, assignments, and rewards in one live workspace.
-                </p>
-              </>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
             )}
           </div>
 

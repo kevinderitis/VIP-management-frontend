@@ -284,9 +284,8 @@ export const RoomStatusModal = ({
                       <input
                         type="number"
                         min={2}
-                        max={14}
                         value={bedCount}
-                        onChange={(event) => setBedCount(Number(event.target.value))}
+                        onChange={(event) => setBedCount(Math.max(2, Number(event.target.value) || 2))}
                         className="rounded-2xl border-slate-200"
                       />
                     </label>
@@ -451,9 +450,8 @@ export const RoomStatusModal = ({
                     <input
                       type="number"
                       min={2}
-                      max={14}
                       value={bedCount}
-                      onChange={(event) => setBedCount(Number(event.target.value))}
+                      onChange={(event) => setBedCount(Math.max(2, Number(event.target.value) || 2))}
                       className="rounded-2xl border-slate-200"
                     />
                   </label>

@@ -22,7 +22,7 @@ export const AdminTasksPage = () => {
   const assignTask = useAppStore((state) => state.assignTask)
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [hideRoomTasks, setHideRoomTasks] = useState(false)
+  const [hideRoomTasks, setHideRoomTasks] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [assignmentOpen, setAssignmentOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
