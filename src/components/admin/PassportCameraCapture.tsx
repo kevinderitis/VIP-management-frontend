@@ -210,7 +210,7 @@ export const PassportCameraCapture = ({
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black md:items-center md:justify-center md:bg-slate-950/80 md:p-6 md:backdrop-blur-sm">
-      <div className="flex h-full flex-col bg-black md:h-auto md:max-h-[88vh] md:w-full md:max-w-[430px] md:overflow-hidden md:rounded-[32px] md:border md:border-white/10 md:bg-slate-950 md:shadow-2xl">
+      <div className="flex h-full flex-col bg-black md:h-[min(88vh,820px)] md:w-full md:max-w-[430px] md:overflow-hidden md:rounded-[32px] md:border md:border-white/10 md:bg-slate-950 md:shadow-2xl">
         <div className="flex items-center justify-between bg-slate-950 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white md:pt-5">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-white/60">Passport scanner</p>
@@ -229,7 +229,7 @@ export const PassportCameraCapture = ({
           <div className="px-4 py-4 text-sm text-red-300">{error}</div>
         ) : null}
 
-        <div className="relative flex-1 overflow-hidden md:min-h-[560px]">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
           <div className="absolute inset-x-0 bottom-28 flex justify-center px-4 pb-2 sm:bottom-32 md:bottom-20">
             <div className="w-full max-w-md">

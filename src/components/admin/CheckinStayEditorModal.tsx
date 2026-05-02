@@ -346,179 +346,204 @@ export const CheckinStayEditorModal = ({
       panelClassName="h-[calc(100dvh-2rem)] max-w-6xl overflow-x-hidden sm:h-auto"
       bodyClassName="!overflow-hidden"
     >
-      <div className="hidden h-full min-h-0 gap-6 overflow-hidden lg:grid lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="min-h-0 space-y-5 overflow-y-auto overflow-x-hidden pr-2">
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2 [&_input]:min-w-0 [&_input]:w-full [&_select]:min-w-0 [&_select]:w-full">
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              First name
-              <input value={draft.firstName} onChange={(event) => setField('firstName', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Middle name
-              <input value={draft.middleName} onChange={(event) => setField('middleName', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Last name
-              <input value={draft.lastName} onChange={(event) => setField('lastName', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Gender
-              <select
-                value={draft.gender}
-                onChange={(event) => setField('gender', event.target.value as 'M' | 'F')}
-                className="rounded-2xl border-slate-200"
+      <div className="hidden h-full min-h-0 flex-col gap-4 overflow-hidden lg:flex">
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { step: 1 as const, label: 'Details' },
+            { step: 2 as const, label: 'Room' },
+            { step: 3 as const, label: 'Bed' },
+          ].map((item) => {
+            const active = item.step === mobileStep
+            const enabled = item.step < 3 || selectedRoom?.roomType === 'shared'
+            return (
+              <button
+                key={item.step}
+                type="button"
+                disabled={!enabled}
+                onClick={() => enabled && setMobileStep(item.step)}
+                className={`rounded-2xl px-3 py-3 text-sm font-semibold uppercase tracking-[0.16em] ${
+                  active ? 'bg-ink text-white' : 'bg-slate-100 text-slate-500'
+                } ${!enabled ? 'opacity-40' : ''}`}
               >
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Passport number
-              <input value={draft.passportNo} onChange={(event) => setField('passportNo', event.target.value.toUpperCase())} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Nationality
-              <select
-                value={draft.nationality}
-                onChange={(event) => setField('nationality', event.target.value.toUpperCase())}
-                className="rounded-2xl border-slate-200"
-              >
-                <option value="">Select</option>
-                {countryOptions.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name} ({country.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Birth date
-              <input type="date" value={draft.birthDate} onChange={(event) => setField('birthDate', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Phone
-              <input value={draft.phoneNo} onChange={(event) => setField('phoneNo', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-ink">
-              Check-out date
-              <input type="date" min={todayThailandIso()} value={draft.checkOutDate} onChange={(event) => setField('checkOutDate', event.target.value)} className="rounded-2xl border-slate-200" />
-            </label>
-            <div className="grid gap-2 text-sm font-medium text-ink">
-              Check-in date
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                {draft.checkInDate}
-              </div>
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-ink sm:col-span-2">
-              TM30 status
-              <select value={draft.status} onChange={(event) => setField('status', event.target.value as CheckinRecord['status'])} className="rounded-2xl border-slate-200">
-                <option value="draft">Draft</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="exported">Exported</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <DoorOpen size={16} className="text-teal" />
-              Choose room
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_220px]">
-              <label className="grid gap-2 text-sm font-medium text-ink">
-                <span className="flex items-center gap-2">
-                  <Search size={14} className="text-slate-400" />
-                  Find room
-                </span>
-                <input
-                  value={roomSearch}
-                  onChange={(event) => setRoomSearch(event.target.value)}
-                  placeholder="Search by room code or name"
-                  className="rounded-2xl border-slate-200"
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-medium text-ink">
-                <span className="flex items-center gap-2">
-                  <Filter size={14} className="text-slate-400" />
-                  Room type
-                </span>
-                <select value={roomTypeFilter} onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')} className="rounded-2xl border-slate-200">
-                  <option value="all">All rooms</option>
-                  <option value="private">Private only</option>
-                  <option value="shared">Shared only</option>
-                </select>
-              </label>
-              <div className="flex items-end">
-                <Button type="button" variant={showUnavailableRooms ? 'primary' : 'secondary'} onClick={() => setShowUnavailableRooms((current) => !current)} className="w-full">
-                  {showUnavailableRooms ? 'Showing full rooms' : 'Hide full rooms'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {roomCards.map(({ room, availableBeds, isFull, roomNeedsCleaning }) => (
-                <button
-                  key={room.id}
-                  type="button"
-                  disabled={isFull}
-                  onClick={() => {
-                    setField('roomCode', room.code)
-                    setField('bedNumber', '')
-                  }}
-                  className={`rounded-[24px] p-4 text-left text-white shadow-soft transition ${
-                    draft.roomCode === room.code ? 'ring-2 ring-teal ring-offset-2 ring-offset-white' : ''
-                  } ${isFull ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5'}`}
-                  style={{ backgroundColor: roomNeedsCleaning ? '#f97316' : isFull ? '#64748b' : '#22c55e' }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-display text-xl font-semibold">{room.code}</p>
-                      <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/85">{room.section}</p>
-                    </div>
-                    {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-                      {room.roomType}
-                    </span>
-                    {room.roomType === 'shared' ? (
-                      <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-                        {availableBeds} available beds
-                      </span>
-                    ) : null}
-                    {roomNeedsCleaning ? (
-                      <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-                        Needs cleaning
-                      </span>
-                    ) : null}
-                    {isFull ? (
-                      <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-                        Full
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+                {item.label}
+              </button>
+            )
+          })}
         </div>
 
-        <div className="flex h-full min-h-0 flex-col gap-5">
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <BedDouble size={16} className="text-teal" />
-              Bed assignment
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
+          {mobileStep === 1 ? (
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 [&_input]:min-w-0 [&_input]:w-full [&_select]:min-w-0 [&_select]:w-full">
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                First name
+                <input value={draft.firstName} onChange={(event) => setField('firstName', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Middle name
+                <input value={draft.middleName} onChange={(event) => setField('middleName', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Last name
+                <input value={draft.lastName} onChange={(event) => setField('lastName', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Gender
+                <select
+                  value={draft.gender}
+                  onChange={(event) => setField('gender', event.target.value as 'M' | 'F')}
+                  className="rounded-2xl border-slate-200"
+                >
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Passport number
+                <input value={draft.passportNo} onChange={(event) => setField('passportNo', event.target.value.toUpperCase())} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Nationality
+                <select
+                  value={draft.nationality}
+                  onChange={(event) => setField('nationality', event.target.value.toUpperCase())}
+                  className="rounded-2xl border-slate-200"
+                >
+                  <option value="">Select</option>
+                  {countryOptions.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name} ({country.code})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Birth date
+                <input type="date" value={draft.birthDate} onChange={(event) => setField('birthDate', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Phone
+                <input value={draft.phoneNo} onChange={(event) => setField('phoneNo', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-ink">
+                Check-out date
+                <input type="date" min={todayThailandIso()} value={draft.checkOutDate} onChange={(event) => setField('checkOutDate', event.target.value)} className="rounded-2xl border-slate-200" />
+              </label>
+              <div className="grid gap-2 text-sm font-medium text-ink">
+                Check-in date
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  {draft.checkInDate}
+                </div>
+              </div>
+              <label className="grid gap-2 text-sm font-medium text-ink sm:col-span-2">
+                TM30 status
+                <select value={draft.status} onChange={(event) => setField('status', event.target.value as CheckinRecord['status'])} className="rounded-2xl border-slate-200">
+                  <option value="draft">Draft</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="exported">Exported</option>
+                </select>
+              </label>
             </div>
-            {selectedRoom ? (
-              <>
-                <p className="mt-2 text-sm text-slate-500">
-                  {selectedRoom.roomType === 'shared'
-                    ? 'Choose one available bed. Occupied or cleaning-blocked beds stay unavailable for selection.'
-                    : 'Private rooms can host up to two guests. If there is space left, you can confirm check-in directly.'}
-                </p>
+          ) : null}
 
-                {selectedRoom.roomType === 'shared' ? (
+          {mobileStep === 2 ? (
+            <div className="grid gap-4">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <DoorOpen size={16} className="text-teal" />
+                  Choose room
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_220px]">
+                  <label className="grid gap-2 text-sm font-medium text-ink">
+                    <span className="flex items-center gap-2">
+                      <Search size={14} className="text-slate-400" />
+                      Find room
+                    </span>
+                    <input
+                      value={roomSearch}
+                      onChange={(event) => setRoomSearch(event.target.value)}
+                      placeholder="Search by room code or name"
+                      className="rounded-2xl border-slate-200"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-ink">
+                    <span className="flex items-center gap-2">
+                      <Filter size={14} className="text-slate-400" />
+                      Room type
+                    </span>
+                    <select value={roomTypeFilter} onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')} className="rounded-2xl border-slate-200">
+                      <option value="all">All rooms</option>
+                      <option value="private">Private only</option>
+                      <option value="shared">Shared only</option>
+                    </select>
+                  </label>
+                  <div className="flex items-end">
+                    <Button type="button" variant={showUnavailableRooms ? 'primary' : 'secondary'} onClick={() => setShowUnavailableRooms((current) => !current)} className="w-full">
+                      {showUnavailableRooms ? 'Showing full rooms' : 'Hide full rooms'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {roomCards.map(({ room, availableBeds, isFull, roomNeedsCleaning }) => (
+                    <button
+                      key={room.id}
+                      type="button"
+                      disabled={isFull}
+                      onClick={() => {
+                        setField('roomCode', room.code)
+                        setField('bedNumber', '')
+                      }}
+                      className={`rounded-[24px] p-4 text-left text-white shadow-soft transition ${
+                        draft.roomCode === room.code ? 'ring-2 ring-teal ring-offset-2 ring-offset-white' : ''
+                      } ${isFull ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5'}`}
+                      style={{ backgroundColor: roomNeedsCleaning ? '#f97316' : isFull ? '#64748b' : '#22c55e' }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-display text-xl font-semibold">{room.code}</p>
+                          <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/85">{room.section}</p>
+                        </div>
+                        {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                          {room.roomType}
+                        </span>
+                        {room.roomType === 'shared' ? (
+                          <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                            {availableBeds} available beds
+                          </span>
+                        ) : null}
+                        {roomNeedsCleaning ? (
+                          <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                            Needs cleaning
+                          </span>
+                        ) : null}
+                        {isFull ? (
+                          <span className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                            Full
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {mobileStep === 3 ? (
+            <div className="grid gap-4">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <BedDouble size={16} className="text-teal" />
+                  Bed assignment
+                </div>
+                {selectedRoom ? (
                   <>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Choose one available bed. Occupied or cleaning-blocked beds stay unavailable for selection.
+                    </p>
                     <div className="mt-4 flex items-center justify-between gap-3">
                       <p className="text-sm font-medium text-ink">Beds</p>
                       <Button type="button" size="sm" variant={showUnavailableBeds ? 'primary' : 'secondary'} onClick={() => setShowUnavailableBeds((current) => !current)}>
@@ -544,35 +569,31 @@ export const CheckinStayEditorModal = ({
                     </div>
                   </>
                 ) : (
-                  <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Private room selected. No extra bed selection is needed.
-                  </div>
+                  <p className="mt-2 text-sm text-slate-500">Pick a room first.</p>
                 )}
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-slate-500">Pick a room first.</p>
-            )}
-          </div>
+              </div>
 
-          {roomOccupants.length ? (
-            <div className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
-                <UserRound size={16} />
-                Current occupants
-              </div>
-              <div className="mt-3 grid gap-2">
-                {roomOccupants.map((occupant) => (
-                  <div key={occupant.id} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">
-                    <span className="font-semibold text-ink">
-                      {selectedRoom?.roomType === 'shared' ? `Bed ${occupant.bedNumber}` : 'Private room'}
-                    </span>
-                    <span className="ml-2">{guestName(occupant)}</span>
-                    <span className="ml-2 text-slate-400">
-                      ({occupant.checkInDate} to {occupant.checkOutDate})
-                    </span>
+              {roomOccupants.length ? (
+                <div className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-5">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    <UserRound size={16} />
+                    Current occupants
                   </div>
-                ))}
-              </div>
+                  <div className="mt-3 grid gap-2">
+                    {roomOccupants.map((occupant) => (
+                      <div key={occupant.id} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">
+                        <span className="font-semibold text-ink">
+                          Bed {occupant.bedNumber}
+                        </span>
+                        <span className="ml-2">{guestName(occupant)}</span>
+                        <span className="ml-2 text-slate-400">
+                          ({occupant.checkInDate} to {occupant.checkOutDate})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -584,14 +605,32 @@ export const CheckinStayEditorModal = ({
               </div>
             </div>
           ) : null}
+        </div>
 
-          <div className="sticky bottom-0 mt-auto flex flex-wrap justify-end gap-3 border-t border-slate-200 bg-white pt-4">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => void handleSubmit()} disabled={saving}>
-              {saving ? 'Saving...' : mode === 'edit' ? 'Save changes' : 'Confirm check-in'}
-            </Button>
+        <div className="border-t border-slate-200 bg-white pt-4">
+          <div className="flex justify-end gap-3">
+            {mobileStep > 1 ? (
+              <Button type="button" variant="secondary" onClick={() => setMobileStep((current) => (current === 3 ? 2 : 1))}>
+                Back
+              </Button>
+            ) : (
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+            )}
+            {mobileStep === 1 ? (
+              <Button type="button" onClick={handleMobileNextFromDetails}>
+                Next
+              </Button>
+            ) : mobileStep === 2 ? (
+              <Button type="button" onClick={handleMobileNextFromRoom} disabled={saving}>
+                {selectedRoom?.roomType === 'shared' ? 'Next' : saving ? 'Saving...' : mode === 'edit' ? 'Save changes' : 'Confirm check-in'}
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => void handleSubmit()} disabled={saving}>
+                {saving ? 'Saving...' : mode === 'edit' ? 'Save changes' : 'Confirm check-in'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
