@@ -105,6 +105,7 @@ export const AdminCleaningTasksPage = () => {
   const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
 
   const [search, setSearch] = useState('')
+  const [roomBoardSearch, setRoomBoardSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [roomTypeFilter, setRoomTypeFilter] = useState<'all' | 'private' | 'shared'>('all')
   const [sectionFilter, setSectionFilter] = useState<'all' | string>('all')
@@ -161,7 +162,7 @@ export const AdminCleaningTasksPage = () => {
   )
 
   const groupedRooms = useMemo(() => {
-    const searchValue = search.trim().toLowerCase()
+    const searchValue = roomBoardSearch.trim().toLowerCase()
     const rooms = cleaningRooms.filter((room) => {
       if (!room.isActive) return false
       if (roomTypeFilter !== 'all' && room.roomType !== roomTypeFilter) return false
@@ -194,7 +195,7 @@ export const AdminCleaningTasksPage = () => {
     }))
 
     return grouped.filter((group) => group.rooms.length > 0)
-  }, [activeStays, cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomTypeFilter, search, sectionFilter, tasks])
+  }, [activeStays, cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomBoardSearch, roomTypeFilter, sectionFilter, tasks])
 
   const customPlaceCards = useMemo(
     () =>
@@ -275,11 +276,7 @@ export const AdminCleaningTasksPage = () => {
         title="Cleaning service tasks"
         description="Manage cleaning work, grouped room boards, custom places, and bed-making requests for volunteers."
         action={
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
-            <Button variant="secondary" onClick={() => setBulkBedOpen(true)} className="min-w-0 px-4 sm:px-5">
-              <BedDouble size={16} className="mr-2" />
-              Bulk bed
-            </Button>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-nowrap sm:items-center">
             <Button variant="secondary" onClick={() => setRoomCreateOpen(true)} className="min-w-0">
               <BedDouble size={16} className="mr-2" />
               New room
@@ -334,7 +331,17 @@ export const AdminCleaningTasksPage = () => {
               Rooms are grouped by property. Shared dorms open a bed view, while private rooms keep the simple status plus bed request flow.
             </p>
 
-            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,240px)_auto] lg:items-start lg:justify-between">
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_240px_auto] lg:items-start lg:justify-between">
+              <label className="relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={roomBoardSearch}
+                  onChange={(event) => setRoomBoardSearch(event.target.value)}
+                  placeholder="Search room by number, code, or location"
+                  className="w-full rounded-2xl border-slate-200 pl-11"
+                />
+              </label>
+
               <select
                 value={roomTypeFilter}
                 onChange={(event) => setRoomTypeFilter(event.target.value as 'all' | 'private' | 'shared')}
