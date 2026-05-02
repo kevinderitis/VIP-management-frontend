@@ -20,6 +20,7 @@ export const PassportCameraCapture = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const guideRef = useRef<HTMLDivElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [scanStatus, setScanStatus] = useState('Point the camera at the MRZ area')
   const [isAutoScanning, setIsAutoScanning] = useState(false)
@@ -60,6 +61,7 @@ export const PassportCameraCapture = ({
         },
       })
       setStream(mediaStream)
+      streamRef.current = mediaStream
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
       }
@@ -71,9 +73,15 @@ export const PassportCameraCapture = ({
   }
 
   const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop())
+    const activeStream = streamRef.current
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setStream(null)
   }
 
   const createGuideCropFile = (): Promise<File | null> =>
@@ -201,71 +209,73 @@ export const PassportCameraCapture = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-black">
-      <div className="flex items-center justify-between bg-slate-950 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-white/60">Passport scanner</p>
-          <h3 className="mt-1 font-display text-xl font-semibold">Capture passport</h3>
+    <div className="fixed inset-0 z-[70] flex flex-col bg-black md:items-center md:justify-center md:bg-slate-950/80 md:p-6 md:backdrop-blur-sm">
+      <div className="flex h-full flex-col bg-black md:h-auto md:max-h-[88vh] md:w-full md:max-w-[430px] md:overflow-hidden md:rounded-[32px] md:border md:border-white/10 md:bg-slate-950 md:shadow-2xl">
+        <div className="flex items-center justify-between bg-slate-950 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white md:pt-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-white/60">Passport scanner</p>
+            <h3 className="mt-1 font-display text-xl font-semibold">Capture passport</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10"
+          >
+            <X size={18} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10"
-        >
-          <X size={18} />
-        </button>
-      </div>
 
-      {error ? (
-        <div className="px-4 py-4 text-sm text-red-300">{error}</div>
-      ) : null}
+        {error ? (
+          <div className="px-4 py-4 text-sm text-red-300">{error}</div>
+        ) : null}
 
-      <div className="relative flex-1 overflow-hidden">
-        <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-        <div className="absolute inset-x-0 bottom-28 flex justify-center px-4 pb-2 sm:bottom-32">
-          <div className="w-full max-w-md">
-            <div className="absolute -top-14 left-0 right-0">
-              <p className="text-center text-xs font-medium text-white drop-shadow-lg sm:text-sm">
-                Align MRZ zone with guide
-                <br />
-                <span className="text-[10px] text-white/90 sm:text-xs">
-                  {scanStatus}
-                  {isAutoScanning ? ' (scanning...)' : ''}
-                </span>
-              </p>
-            </div>
-            <div
-              ref={guideRef}
-              className="relative rounded-lg border-4 border-dashed border-green-400"
-              style={{ aspectRatio: '3.5/1' }}
-            >
-              <div className="absolute left-0 right-0 top-1/2 h-0 -translate-y-1/2 border-t-2 border-dashed border-green-400/60" />
+        <div className="relative flex-1 overflow-hidden md:min-h-[560px]">
+          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+          <div className="absolute inset-x-0 bottom-28 flex justify-center px-4 pb-2 sm:bottom-32 md:bottom-20">
+            <div className="w-full max-w-md">
+              <div className="absolute -top-14 left-0 right-0">
+                <p className="text-center text-xs font-medium text-white drop-shadow-lg sm:text-sm">
+                  Align MRZ zone with guide
+                  <br />
+                  <span className="text-[10px] text-white/90 sm:text-xs">
+                    {scanStatus}
+                    {isAutoScanning ? ' (scanning...)' : ''}
+                  </span>
+                </p>
+              </div>
+              <div
+                ref={guideRef}
+                className="relative rounded-lg border-4 border-dashed border-green-400"
+                style={{ aspectRatio: '3.5/1' }}
+              >
+                <div className="absolute left-0 right-0 top-1/2 h-0 -translate-y-1/2 border-t-2 border-dashed border-green-400/60" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between gap-3 bg-slate-950 p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onManualEntry}
-          className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
-        >
-          <Keyboard size={16} className="mr-2" />
-          Manual entry
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onCancel}
-          className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
-        >
-          Cancel
-        </Button>
-      </div>
+        <div className="flex items-center justify-between gap-3 bg-slate-950 p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] md:pb-6">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onManualEntry}
+            className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+          >
+            <Keyboard size={16} className="mr-2" />
+            Manual entry
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+          >
+            Cancel
+          </Button>
+        </div>
 
-      <canvas ref={canvasRef} className="hidden" />
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
     </div>
   )
 }
