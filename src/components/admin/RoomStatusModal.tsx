@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Settings2 } from 'lucide-react'
-import { BedStatus, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, RoomType, User } from '../../types/models'
+import { ActiveStay, BedStatus, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, RoomType, User } from '../../types/models'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 
@@ -22,20 +22,30 @@ const defaultBed = (bedNumber: number): BedStatus => ({
   label: 'Ready',
   color: '#22c55e',
 })
+const PRIVATE_ROOM_CAPACITY = 2
+const guestName = (occupancy: ActiveStay) => occupancy.guestName || occupancy.passportNo
+const normalizeStatusLabel = (value?: string) => value?.trim().toLowerCase() ?? ''
 
 export const RoomStatusModal = ({
   open,
   onClose,
   room,
+  rooms,
+  roomStatuses,
   currentStatus,
   cleaners,
   volunteers,
   roomTasks,
+  activeStays,
+  onMoveStay,
+  onRemoveStay,
   onSubmit,
 }: {
   open: boolean
   onClose: () => void
   room: CleaningRoom
+  rooms: CleaningRoom[]
+  roomStatuses: CleaningPlaceStatus[]
   currentStatus?: CleaningPlaceStatus
   cleaners: User[]
   volunteers: User[]
@@ -48,6 +58,9 @@ export const RoomStatusModal = ({
     bedTask?: boolean
     roomTaskType?: string
   }>
+  activeStays: ActiveStay[]
+  onMoveStay: (stayId: string, destination: { roomCode: string; bedNumber?: number }) => Promise<void> | void
+  onRemoveStay: (stayId: string) => Promise<void> | void
   onSubmit: (
     input: CleaningPlaceStatusDraftInput,
     roomConfig: {
@@ -74,6 +87,12 @@ export const RoomStatusModal = ({
   const [showStructureSettings, setShowStructureSettings] = useState(false)
   const [editingBedNumber, setEditingBedNumber] = useState<number | null>(null)
   const [mobileVolunteerPromptOpen, setMobileVolunteerPromptOpen] = useState(false)
+  const [occupantActionStay, setOccupantActionStay] = useState<ActiveStay | null>(null)
+  const [stayPendingRemoval, setStayPendingRemoval] = useState<ActiveStay | null>(null)
+  const [stayPendingMove, setStayPendingMove] = useState<ActiveStay | null>(null)
+  const [moveRoomCode, setMoveRoomCode] = useState('')
+  const [moveBedNumber, setMoveBedNumber] = useState('')
+  const [stayActionSaving, setStayActionSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -92,6 +111,12 @@ export const RoomStatusModal = ({
     setShowStructureSettings(false)
     setEditingBedNumber(null)
     setMobileVolunteerPromptOpen(false)
+    setOccupantActionStay(null)
+    setStayPendingRemoval(null)
+    setStayPendingMove(null)
+    setMoveRoomCode('')
+    setMoveBedNumber('')
+    setStayActionSaving(false)
   }, [open, room.id, currentStatus?.id])
 
   const visibleBeds = useMemo(() => {
@@ -138,6 +163,44 @@ export const RoomStatusModal = ({
     }, {})
   }, [room.roomType, roomTasks, visibleBeds, volunteers])
 
+  const bedOccupants = useMemo(
+    () =>
+      visibleBeds.reduce<Record<number, ActiveStay | undefined>>((accumulator, bed) => {
+        const occupant = activeStays.find((stay) =>
+          room.roomType === 'private'
+            ? !stay.bedNumber
+            : stay.bedNumber === bed.bedNumber,
+        )
+        accumulator[bed.bedNumber] = occupant
+        return accumulator
+      }, {}),
+    [activeStays, room.roomType, visibleBeds],
+  )
+
+  const roomOccupants = useMemo(
+    () => activeStays.filter((stay) => stay.roomCode === room.code),
+    [activeStays, room.code],
+  )
+
+  const roomStatusMap = useMemo(
+    () =>
+      new Map(
+        roomStatuses
+          .filter((status) => status.placeType === 'room' && status.roomCode)
+          .map((status) => [status.roomCode as string, status]),
+      ),
+    [roomStatuses],
+  )
+
+  const occupantsByRoom = useMemo(() => {
+    const map = new Map<string, ActiveStay[]>()
+    for (const stay of activeStays) {
+      if (!stay.roomCode) continue
+      map.set(stay.roomCode, [...(map.get(stay.roomCode) ?? []), stay])
+    }
+    return map
+  }, [activeStays])
+
   const hasBedsToAssign = visibleBeds.some((bed) => {
     const normalized = bed.label.toLowerCase()
     return normalized === 'needs making' || normalized === 'check'
@@ -148,6 +211,84 @@ export const RoomStatusModal = ({
       setEditingBedNumber(null)
     }
   }, [editingBedNumber, visibleBeds])
+
+  const getAvailableBedsForRoom = (destinationRoom: CleaningRoom, movingStay?: ActiveStay | null) => {
+    const roomOccupants = occupantsByRoom.get(destinationRoom.code) ?? []
+    const destinationStatus = roomStatusMap.get(destinationRoom.code)
+
+    if (destinationRoom.roomType === 'private') return []
+
+    return Array.from({ length: destinationRoom.bedCount }, (_, index) => index + 1).filter((bedNumber) => {
+      const occupiedByAnotherGuest = roomOccupants.some(
+        (stay) => stay.id !== movingStay?.id && stay.bedNumber === bedNumber,
+      )
+      if (occupiedByAnotherGuest) return false
+      const bedStatus = destinationStatus?.beds.find((bed) => bed.bedNumber === bedNumber)
+      const bedLabel = normalizeStatusLabel(bedStatus?.label)
+      if (bedLabel === 'occupied' || bedLabel === 'needs cleaning' || bedLabel === 'need cleaning') {
+        return false
+      }
+      if (
+        movingStay &&
+        destinationRoom.code === movingStay.roomCode &&
+        movingStay.bedNumber === bedNumber
+      ) {
+        return false
+      }
+      return true
+    })
+  }
+
+  const roomMoveOptions = useMemo(() => {
+    return rooms
+      .filter((entry) => entry.isActive)
+      .map((entry) => {
+        const availableBeds = getAvailableBedsForRoom(entry, stayPendingMove)
+        const roomOccupants = occupantsByRoom.get(entry.code) ?? []
+        const destinationStatus = roomStatusMap.get(entry.code)
+        const roomNeedsCleaning =
+          normalizeStatusLabel(destinationStatus?.roomServiceLabel || destinationStatus?.label) === 'needs cleaning' ||
+          normalizeStatusLabel(destinationStatus?.roomServiceLabel || destinationStatus?.label) === 'need cleaning'
+        const privateAvailable =
+          entry.roomType === 'private' &&
+          !roomNeedsCleaning &&
+          roomOccupants.filter((stay) => stay.id !== stayPendingMove?.id).length < PRIVATE_ROOM_CAPACITY
+
+        const isAvailable = entry.roomType === 'shared' ? availableBeds.length > 0 : privateAvailable
+
+        return {
+          room: entry,
+          availableBeds,
+          isAvailable,
+        }
+      })
+      .filter((entry) => entry.isAvailable)
+      .sort((left, right) => left.room.section.localeCompare(right.room.section) || left.room.code.localeCompare(right.room.code))
+  }, [occupantsByRoom, roomStatusMap, rooms, stayPendingMove])
+
+  useEffect(() => {
+    if (!stayPendingMove) return
+
+    const preferredSameRoom = roomMoveOptions.find(
+      (entry) =>
+        entry.room.code === stayPendingMove.roomCode &&
+        (entry.room.roomType === 'shared' ? entry.availableBeds.length > 0 : false),
+    )
+    const fallbackRoom = preferredSameRoom ?? roomMoveOptions[0]
+
+    if (!fallbackRoom) {
+      setMoveRoomCode('')
+      setMoveBedNumber('')
+      return
+    }
+
+    setMoveRoomCode(fallbackRoom.room.code)
+    if (fallbackRoom.room.roomType === 'shared') {
+      setMoveBedNumber(String(fallbackRoom.availableBeds[0] ?? ''))
+    } else {
+      setMoveBedNumber('')
+    }
+  }, [roomMoveOptions, stayPendingMove])
 
   const submitRoomSetup = async () => {
     const nextBeds = visibleBeds
@@ -200,8 +341,44 @@ export const RoomStatusModal = ({
     ? visibleBeds.find((bed) => bed.bedNumber === editingBedNumber) ?? null
     : null
 
+  const handleConfirmRemoveStay = async () => {
+    if (!stayPendingRemoval) return
+    setStayActionSaving(true)
+    try {
+      await onRemoveStay(stayPendingRemoval.id)
+      setStayPendingRemoval(null)
+      setOccupantActionStay(null)
+    } finally {
+      setStayActionSaving(false)
+    }
+  }
+
+  const handleConfirmMoveStay = async () => {
+    if (!stayPendingMove || !moveRoomCode) return
+    const destinationRoom = rooms.find((entry) => entry.code === moveRoomCode)
+    if (!destinationRoom) return
+
+    setStayActionSaving(true)
+    try {
+      if (destinationRoom.roomType === 'shared') {
+        const parsedBed = Number(moveBedNumber)
+        if (!moveBedNumber || Number.isNaN(parsedBed) || parsedBed < 1) return
+        await onMoveStay(stayPendingMove.id, { roomCode: destinationRoom.code, bedNumber: parsedBed })
+      } else {
+        await onMoveStay(stayPendingMove.id, { roomCode: destinationRoom.code })
+      }
+      setStayPendingMove(null)
+      setOccupantActionStay(null)
+      setMoveRoomCode('')
+      setMoveBedNumber('')
+    } finally {
+      setStayActionSaving(false)
+    }
+  }
+
   const renderBedTile = (bed: BedStatus) => {
     const assignee = bedTaskAssignees[bed.bedNumber]
+    const occupant = bedOccupants[bed.bedNumber]
 
     return (
       <button
@@ -214,7 +391,9 @@ export const RoomStatusModal = ({
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-ink">Bed {bed.bedNumber}</p>
             <p className="mt-1 break-words text-xs font-medium text-slate-500">
-              {assignee?.current
+              {occupant
+                ? 'Guest assigned'
+                : assignee?.current
                 ? `Assigned now: ${assignee.current}`
                 : assignee?.last
                   ? `Last assigned: ${assignee.last}`
@@ -231,6 +410,20 @@ export const RoomStatusModal = ({
             <span className="truncate">{bed.label}</span>
           </span>
         </div>
+        {occupant ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setOccupantActionStay(occupant)
+              }}
+              className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-soft transition hover:border-slate-300"
+            >
+              <span className="truncate">{occupant.guestName}</span>
+            </button>
+          </div>
+        ) : null}
       </button>
     )
   }
@@ -395,6 +588,29 @@ export const RoomStatusModal = ({
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {visibleBeds.map(renderBedTile)}
               </div>
+              {roomOccupants.length ? (
+                <div className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    Current occupants
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {roomOccupants.map((occupant) => (
+                      <div key={occupant.id} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setOccupantActionStay(occupant)}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-semibold text-ink transition hover:border-slate-300"
+                        >
+                          {guestName(occupant)}
+                        </button>
+                        <span className="ml-2 text-slate-400">
+                          ({occupant.checkInDate} to {occupant.checkOutDate})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -410,6 +626,29 @@ export const RoomStatusModal = ({
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {visibleBeds.map(renderBedTile)}
               </div>
+              {roomOccupants.length ? (
+                <div className="rounded-[24px] border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+                    Current occupants
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {roomOccupants.map((occupant) => (
+                      <div key={occupant.id} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setOccupantActionStay(occupant)}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-semibold text-ink transition hover:border-slate-300"
+                        >
+                          {guestName(occupant)}
+                        </button>
+                        <span className="ml-2 text-slate-400">
+                          ({occupant.checkInDate} to {occupant.checkOutDate})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -650,6 +889,137 @@ export const RoomStatusModal = ({
           </div>
         </div>
       </form>
+      </Modal>
+      <Modal
+        open={Boolean(occupantActionStay)}
+        onClose={() => setOccupantActionStay(null)}
+        title={occupantActionStay ? occupantActionStay.guestName : 'Guest options'}
+        description="Choose what you want to do with this guest assignment."
+        panelClassName="max-w-sm"
+      >
+        {occupantActionStay ? (
+          <div className="grid gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setStayPendingMove(occupantActionStay)
+                setOccupantActionStay(null)
+              }}
+              className="justify-start"
+            >
+              Move
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                setStayPendingRemoval(occupantActionStay)
+                setOccupantActionStay(null)
+              }}
+              className="justify-start"
+            >
+              Remove
+            </Button>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
+        open={Boolean(stayPendingRemoval)}
+        onClose={() => setStayPendingRemoval(null)}
+        title="Remove guest from bed?"
+        description={
+          stayPendingRemoval
+            ? `${stayPendingRemoval.guestName} will be removed from the current room assignment.`
+            : 'Remove the current guest assignment.'
+        }
+        panelClassName="max-w-md"
+      >
+        <div className="grid gap-4">
+          <p className="text-sm text-slate-500">
+            This keeps the passport record but clears the current room or bed assignment.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setStayPendingRemoval(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void handleConfirmRemoveStay()} disabled={stayActionSaving}>
+              {stayActionSaving ? 'Removing...' : 'Confirm remove'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        open={Boolean(stayPendingMove)}
+        onClose={() => setStayPendingMove(null)}
+        title={stayPendingMove ? `Move ${stayPendingMove.guestName}` : 'Move guest'}
+        description="Choose a destination room and, if needed, the destination bed."
+        panelClassName="max-w-lg"
+      >
+        {stayPendingMove ? (
+          <div className="grid gap-4">
+            <label className="grid gap-2 text-sm font-medium text-ink">
+              Room
+              <select
+                value={moveRoomCode}
+                onChange={(event) => {
+                  const nextRoomCode = event.target.value
+                  setMoveRoomCode(nextRoomCode)
+                  const nextRoom = roomMoveOptions.find((entry) => entry.room.code === nextRoomCode)
+                  if (nextRoom?.room.roomType === 'shared') {
+                    setMoveBedNumber(String(nextRoom.availableBeds[0] ?? ''))
+                  } else {
+                    setMoveBedNumber('')
+                  }
+                }}
+                className="rounded-2xl border-slate-200"
+              >
+                {roomMoveOptions.map((entry) => (
+                  <option key={entry.room.id} value={entry.room.code}>
+                    {entry.room.code} · {entry.room.section}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {(() => {
+              const selectedMoveRoom = roomMoveOptions.find((entry) => entry.room.code === moveRoomCode)
+              if (!selectedMoveRoom || selectedMoveRoom.room.roomType !== 'shared') return null
+              return (
+                <label className="grid gap-2 text-sm font-medium text-ink">
+                  Bed
+                  <select
+                    value={moveBedNumber}
+                    onChange={(event) => setMoveBedNumber(event.target.value)}
+                    className="rounded-2xl border-slate-200"
+                  >
+                    {selectedMoveRoom.availableBeds.map((bedNumber) => (
+                      <option key={bedNumber} value={bedNumber}>
+                        Bed {bedNumber}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
+            })()}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setStayPendingMove(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleConfirmMoveStay()}
+                disabled={
+                  stayActionSaving ||
+                  !moveRoomCode ||
+                  (roomMoveOptions.find((entry) => entry.room.code === moveRoomCode)?.room.roomType === 'shared' &&
+                    !moveBedNumber)
+                }
+              >
+                {stayActionSaving ? 'Moving...' : 'Move guest'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
       <Modal
         open={Boolean(editingBed)}

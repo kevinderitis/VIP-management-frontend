@@ -15,11 +15,15 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   token?: string
   body?: unknown
+  responseType?: 'json' | 'blob'
+  headers?: Record<string, string>
 }
 
-const buildHeaders = (token?: string) => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+const buildHeaders = (token?: string, body?: unknown, customHeaders?: Record<string, string>) => {
+  const headers: Record<string, string> = { ...(customHeaders ?? {}) }
+
+  if (!(body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
   }
 
   if (token) {
@@ -36,8 +40,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
   try {
     response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
       method: options.method ?? 'GET',
-      headers: buildHeaders(options.token),
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      headers: buildHeaders(options.token, options.body, options.headers),
+      body:
+        options.body instanceof FormData
+          ? options.body
+          : options.body !== undefined
+            ? JSON.stringify(options.body)
+            : undefined,
     })
   } catch {
     throw new ApiError('Could not reach the server. Please check your connection and try again.')
@@ -69,6 +78,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
 
   if (response.status === 204) {
     return undefined as T
+  }
+
+  if (options.responseType === 'blob') {
+    return response.blob() as Promise<T>
   }
 
   return response.json() as Promise<T>

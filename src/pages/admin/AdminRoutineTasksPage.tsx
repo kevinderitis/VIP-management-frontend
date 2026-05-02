@@ -17,6 +17,7 @@ import {
 import { Link } from 'react-router-dom'
 import { RoutineAssignmentModal } from '../../components/admin/RoutineAssignmentModal'
 import { RoutineTaskEditorModal } from '../../components/admin/RoutineTaskEditorModal'
+import { AdminToolbar } from '../../components/common/AdminToolbar'
 import { PriorityBadge } from '../../components/common/Badge'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
@@ -161,7 +162,8 @@ export const AdminRoutineTasksPage = () => {
         }
       />
 
-      <Panel className="p-4">
+      <AdminToolbar>
+      <Panel className="admin-sticky-toolbar p-4">
         <label className="relative block">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -172,6 +174,7 @@ export const AdminRoutineTasksPage = () => {
           />
         </label>
       </Panel>
+      </AdminToolbar>
 
       <Panel className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-5">

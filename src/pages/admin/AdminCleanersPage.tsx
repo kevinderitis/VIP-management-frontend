@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown, Plus, Search, Trash2, UserCog, UserRoundSearch } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { CleanerEditorModal } from '../../components/admin/CleanerEditorModal'
+import { AdminToolbar } from '../../components/common/AdminToolbar'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
 import { Panel } from '../../components/common/Panel'
@@ -50,7 +51,8 @@ export const AdminCleanersPage = () => {
           </Button>
         }
       />
-      <Panel className="p-4">
+      <AdminToolbar>
+      <Panel className="admin-sticky-toolbar p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -72,6 +74,7 @@ export const AdminCleanersPage = () => {
           </select>
         </div>
       </Panel>
+      </AdminToolbar>
       <div className="grid gap-3">
         {filtered.length ? (
           filtered.map((cleaner) => (

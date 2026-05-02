@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { CalendarClock, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { TaskAssignmentModal } from '../../components/admin/TaskAssignmentModal'
 import { TaskEditorModal } from '../../components/admin/TaskEditorModal'
+import { AdminToolbar } from '../../components/common/AdminToolbar'
 import { PriorityBadge, StatusBadge } from '../../components/common/Badge'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
@@ -131,7 +132,8 @@ export const AdminTasksPage = () => {
           </Button>
         }
       />
-      <Panel className="p-4">
+      <AdminToolbar>
+      <Panel className="admin-sticky-toolbar p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_auto]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -164,6 +166,7 @@ export const AdminTasksPage = () => {
           </Button>
         </div>
       </Panel>
+      </AdminToolbar>
 
       {filteredTasks.length === 0 ? (
         <EmptyState

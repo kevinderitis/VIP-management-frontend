@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { BellRing, ChevronDown, Coins, Medal, Plus, Search, Trash2, UserCog, UserRoundSearch } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { VolunteerEditorModal } from '../../components/admin/VolunteerEditorModal'
+import { AdminToolbar } from '../../components/common/AdminToolbar'
 import { Button } from '../../components/common/Button'
 import { EmptyState } from '../../components/common/EmptyState'
 import { Panel } from '../../components/common/Panel'
@@ -98,7 +99,8 @@ export const AdminVolunteersPage = () => {
           </div>
         }
       />
-      <Panel className="p-4">
+      <AdminToolbar>
+      <Panel className="admin-sticky-toolbar p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -120,6 +122,7 @@ export const AdminVolunteersPage = () => {
           </select>
         </div>
       </Panel>
+      </AdminToolbar>
       <div className={`grid gap-3 ${mobileSelectionMode && selectedVolunteerIds.length > 0 ? 'pb-28 sm:pb-0' : ''}`}>
         {filteredVolunteers.length ? filteredVolunteers.map((volunteer) => (
           <Panel key={volunteer.id} className="overflow-hidden rounded-[24px]">

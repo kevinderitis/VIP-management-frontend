@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
@@ -12,6 +12,7 @@ import { EmptyState } from '../../components/common/EmptyState'
 import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
+import { checkinsApi } from '../../lib/checkins'
 import { useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
 import { BedConflict, CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 import { formatDateTime, formatTimeRange } from '../../utils/format'
@@ -77,9 +78,12 @@ const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceSta
 }
 
 export const AdminCleaningTasksPage = () => {
+  const token = useAppStore((state) => state.accessToken)
+  const refreshState = useAppStore((state) => state.refreshState)
   const tasks = useAppStore((state) => state.tasks)
   const cleaningAreas = useAppStore((state) => state.cleaningAreas)
   const cleaningRooms = useAppStore((state) => state.cleaningRooms)
+  const activeStays = useAppStore((state) => state.activeStays)
   const bedConflicts = useAppStore((state) => state.bedConflicts)
   const cleaningPlaceStatuses = useAppStore((state) => state.cleaningPlaceStatuses)
   const createCleaningTask = useAppStore((state) => state.createCleaningTask)
@@ -122,6 +126,8 @@ export const AdminCleaningTasksPage = () => {
   const [roomBoardOpen, setRoomBoardOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
   const [bedConflictsOpen, setBedConflictsOpen] = useState(true)
+  const [bedConflictsPage, setBedConflictsPage] = useState(1)
+  const bedConflictsPageSize = 10
   const [newRoom, setNewRoom] = useState<{
     code: string
     section: string
@@ -188,7 +194,7 @@ export const AdminCleaningTasksPage = () => {
     }))
 
     return grouped.filter((group) => group.rooms.length > 0)
-  }, [cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomTypeFilter, search, sectionFilter, tasks])
+  }, [activeStays, cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomTypeFilter, search, sectionFilter, tasks])
 
   const customPlaceCards = useMemo(
     () =>
@@ -225,6 +231,16 @@ export const AdminCleaningTasksPage = () => {
       }),
     [bedConflicts, search],
   )
+
+  const totalBedConflictPages = Math.max(1, Math.ceil(filteredBedConflicts.length / bedConflictsPageSize))
+  const paginatedBedConflicts = filteredBedConflicts.slice(
+    (bedConflictsPage - 1) * bedConflictsPageSize,
+    bedConflictsPage * bedConflictsPageSize,
+  )
+
+  useEffect(() => {
+    setBedConflictsPage((current) => Math.min(current, totalBedConflictPages))
+  }, [totalBedConflictPages])
 
   const currentStatus = useMemo(() => {
     if (!selectedPlace) return undefined
@@ -293,32 +309,6 @@ export const AdminCleaningTasksPage = () => {
           </div>
         }
       />
-
-      <Panel className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-          <label className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by title, description, room code, or location"
-              className="w-full rounded-2xl border-slate-200 pl-11"
-            />
-          </label>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-2xl border-slate-200"
-          >
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="available">Available</option>
-            <option value="assigned">Assigned</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-      </Panel>
 
       <Panel className="overflow-hidden p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -577,7 +567,7 @@ export const AdminCleaningTasksPage = () => {
         {bedConflictsOpen ? (
           filteredBedConflicts.length ? (
             <div className="mt-4 grid gap-3">
-              {filteredBedConflicts.map((conflict: BedConflict) => (
+              {paginatedBedConflicts.map((conflict: BedConflict) => (
                 <div key={conflict.id} className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
@@ -594,6 +584,9 @@ export const AdminCleaningTasksPage = () => {
                         </span>
                         <span>{formatDateTime(conflict.createdAt)}</span>
                       </div>
+                      {conflict.detail ? (
+                        <p className="mt-2 text-sm text-slate-600">{conflict.detail}</p>
+                      ) : null}
                     </div>
                     <Button
                       size="sm"
@@ -608,6 +601,26 @@ export const AdminCleaningTasksPage = () => {
                   </div>
                 </div>
               ))}
+              {totalBedConflictPages > 1 ? (
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bedConflictsPage === 1}
+                    onClick={() => setBedConflictsPage((current) => Math.max(1, current - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bedConflictsPage === totalBedConflictPages}
+                    onClick={() => setBedConflictsPage((current) => Math.min(totalBedConflictPages, current + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-dashed border-slate-200 px-5 py-8 text-sm text-slate-500">
@@ -615,6 +628,35 @@ export const AdminCleaningTasksPage = () => {
             </div>
           )
         ) : null}
+      </Panel>
+
+      <Panel className="sticky top-[calc(var(--admin-header-height,152px)+0.75rem)] z-10 p-4 backdrop-blur">
+        <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+          <label className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setBedConflictsPage(1)
+              }}
+              placeholder="Search by title, description, room code, or location"
+              className="w-full rounded-2xl border-slate-200 pl-11"
+            />
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="rounded-2xl border-slate-200"
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="available">Available</option>
+            <option value="assigned">Assigned</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
       </Panel>
 
       {filteredTasks.length === 0 ? (
@@ -821,10 +863,23 @@ export const AdminCleaningTasksPage = () => {
           open={roomModalOpen}
           onClose={() => setRoomModalOpen(false)}
           room={selectedRoom}
+          rooms={cleaningRooms.filter((room) => room.isActive)}
+          roomStatuses={cleaningPlaceStatuses}
           currentStatus={currentRoomStatus}
           cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
           volunteers={volunteers}
           roomTasks={tasks.filter((task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === selectedRoom.code)}
+          activeStays={activeStays}
+          onMoveStay={async (stayId, destination) => {
+            if (!token) return
+            await checkinsApi.move(token, stayId, destination)
+            await refreshState()
+          }}
+          onRemoveStay={async (stayId) => {
+            if (!token) return
+            await checkinsApi.clearRoom(token, stayId)
+            await refreshState()
+          }}
           onSubmit={async (input, roomConfig) => {
             await updateCleaningRoom(selectedRoom.id, {
               code: selectedRoom.code,

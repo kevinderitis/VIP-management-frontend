@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { ApiError, apiRequest } from '../lib/api'
 import {
   ActivityItem,
+  ActiveStay,
   BulkBedTaskSelection,
   CleanerDraftInput,
   BedConflict,
@@ -46,6 +47,7 @@ type ServerState = {
   activities: ActivityItem[]
   officeCalls: OfficeCall[]
   bedConflicts: BedConflict[]
+  activeStays: ActiveStay[]
 }
 
 type AppState = ServerState & {
@@ -168,6 +170,7 @@ const emptyServerState: ServerState = {
   activities: [],
   officeCalls: [],
   bedConflicts: [],
+  activeStays: [],
 }
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`

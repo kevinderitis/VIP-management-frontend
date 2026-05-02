@@ -124,6 +124,49 @@ export interface CleaningPlaceStatus {
   beds: BedStatus[]
 }
 
+export interface ActiveStay {
+  id: string
+  guestId: string
+  guestName: string
+  passportNo: string
+  nationality: string
+  roomCode?: string
+  roomSection?: string
+  roomLabel?: string
+  roomType?: RoomType
+  bedNumber?: number
+  checkInDate: string
+  checkOutDate: string
+  status: 'draft' | 'confirmed' | 'exported'
+}
+
+export interface CheckinGuest {
+  id?: string
+  passportNo: string
+  firstName: string
+  middleName?: string
+  lastName: string
+  gender: 'M' | 'F'
+  nationality: string
+  birthDate: string
+  birthDateDDMMYYYY?: string
+}
+
+export interface CheckinRecord {
+  id: string
+  status: 'draft' | 'confirmed' | 'exported'
+  checkInDate: string
+  checkOutDate: string
+  phoneNo?: string
+  mrzScore: number
+  roomCode?: string
+  roomSection?: string
+  roomLabel?: string
+  roomType?: RoomType
+  bedNumber?: number
+  guest: CheckinGuest | null
+}
+
 export interface BedConflict {
   id: string
   roomCode: string
@@ -134,6 +177,7 @@ export interface BedConflict {
   fromColor: string
   toLabel: string
   toColor: string
+  detail?: string
   createdAt: string
   resolvedAt?: string
 }

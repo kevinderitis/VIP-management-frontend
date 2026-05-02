@@ -70,6 +70,11 @@ textarea {
   @apply rounded-[28px] border border-slate-200/70 bg-white shadow-soft;
 }
 
+.admin-sticky-toolbar {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(18px);
+}
+
 .section-title {
   @apply font-display text-xl font-semibold tracking-tight text-ink;
 }

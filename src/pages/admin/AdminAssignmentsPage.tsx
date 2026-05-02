@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarRange, ClipboardList, Repeat2, Search, Trash2, UserRound, UserPlus } from 'lucide-react'
 import { RoutineAssignmentReassignModal } from '../../components/admin/RoutineAssignmentReassignModal'
 import { TaskAssignmentModal } from '../../components/admin/TaskAssignmentModal'
+import { AdminToolbar } from '../../components/common/AdminToolbar'
 import { Button } from '../../components/common/Button'
 import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
@@ -229,7 +230,8 @@ export const AdminAssignmentsPage = () => {
         description="Review who is handling each task right now, filter quickly, and keep recurring work under control."
       />
 
-      <Panel className="p-4">
+      <AdminToolbar>
+      <Panel className="admin-sticky-toolbar p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_220px_220px]">
           <label className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -294,6 +296,7 @@ export const AdminAssignmentsPage = () => {
           </label>
         </div>
       </Panel>
+      </AdminToolbar>
 
       <Panel className="p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">

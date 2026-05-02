@@ -5,12 +5,14 @@ import { CleaningLayout } from '../layouts/CleaningLayout'
 import { VolunteerLayout } from '../layouts/VolunteerLayout'
 import { AdminCleanerDetailPage } from '../pages/admin/AdminCleanerDetailPage'
 import { AdminCleanersPage } from '../pages/admin/AdminCleanersPage'
+import { AdminCheckInPage } from '../pages/admin/AdminCheckInPage'
 import { AdminCleaningTasksPage } from '../pages/admin/AdminCleaningTasksPage'
 import { AdminAssignmentsPage } from '../pages/admin/AdminAssignmentsPage'
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage'
 import { AdminRewardsPage } from '../pages/admin/AdminRewardsPage'
 import { AdminRoutineTasksPage } from '../pages/admin/AdminRoutineTasksPage'
 import { AdminTasksPage } from '../pages/admin/AdminTasksPage'
+import { AdminTm30Page } from '../pages/admin/AdminTm30Page'
 import { AdminVolunteerDetailPage } from '../pages/admin/AdminVolunteerDetailPage'
 import { AdminVolunteersPage } from '../pages/admin/AdminVolunteersPage'
 import { LoginPage } from '../pages/auth/LoginPage'
@@ -66,6 +68,8 @@ export const AppRouter = () => {
           <Route path="tasks" element={<AdminTasksPage />} />
           <Route path="standard-tasks" element={<AdminRoutineTasksPage />} />
           <Route path="assignments" element={<AdminAssignmentsPage />} />
+          <Route path="check-in" element={<AdminCheckInPage />} />
+          <Route path="tm30" element={<AdminTm30Page />} />
           <Route path="volunteers" element={<AdminVolunteersPage />} />
           <Route path="volunteers/:volunteerId" element={<AdminVolunteerDetailPage />} />
           <Route path="cleaners" element={<AdminCleanersPage />} />
