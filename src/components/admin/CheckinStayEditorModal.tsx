@@ -48,7 +48,7 @@ type DraftState = {
   firstName: string
   middleName: string
   lastName: string
-  gender: 'M' | 'F'
+  gender: '' | 'M' | 'F'
   passportNo: string
   nationality: string
   birthDate: string
@@ -95,7 +95,7 @@ export const CheckinStayEditorModal = ({
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: 'M',
+    gender: '',
     passportNo: '',
     nationality: '',
     birthDate: '',
@@ -120,7 +120,7 @@ export const CheckinStayEditorModal = ({
       firstName: record?.guest?.firstName ?? '',
       middleName: record?.guest?.middleName ?? '',
       lastName: record?.guest?.lastName ?? '',
-      gender: record?.guest?.gender ?? 'M',
+      gender: record?.guest?.gender ?? '',
       passportNo: record?.guest?.passportNo ?? '',
       nationality: record?.guest?.nationality ?? '',
       birthDate: birthDateToInput(record?.guest),
@@ -253,16 +253,16 @@ export const CheckinStayEditorModal = ({
       setError('First name, last name, and passport number are required.')
       return false
     }
+    if (!draft.gender) {
+      setError('Gender is required.')
+      return false
+    }
     if (!draft.nationality.trim() || draft.nationality.trim().length !== 3) {
       setError('Nationality is required.')
       return false
     }
     if (!countryOptions.some((entry) => entry.code === draft.nationality.trim().toUpperCase())) {
       setError('Please select a valid nationality.')
-      return false
-    }
-    if (!draft.birthDate) {
-      setError('Birth date is required.')
       return false
     }
     if (!draft.checkOutDate) {
@@ -297,7 +297,7 @@ export const CheckinStayEditorModal = ({
         firstName: draft.firstName.trim(),
         middleName: draft.middleName.trim(),
         lastName: draft.lastName.trim(),
-        gender: draft.gender,
+        gender: draft.gender || 'M',
         nationality: draft.nationality.trim().toUpperCase(),
         birthDate: draft.birthDate,
       },
@@ -343,7 +343,7 @@ export const CheckinStayEditorModal = ({
             : 'Review scanned passport'
       }
       description="Confirm the guest details, choose the room, and place them in the correct bed when the room is shared."
-      panelClassName="h-[calc(100dvh-2rem)] max-w-6xl overflow-x-hidden sm:h-auto"
+      panelClassName="h-[calc(100dvh-2rem)] max-w-6xl overflow-x-hidden sm:h-[min(90vh,920px)]"
       bodyClassName="!overflow-hidden"
     >
       <div className="hidden h-full min-h-0 flex-col gap-4 overflow-hidden lg:flex">
@@ -393,6 +393,7 @@ export const CheckinStayEditorModal = ({
                   onChange={(event) => setField('gender', event.target.value as 'M' | 'F')}
                   className="rounded-2xl border-slate-200"
                 >
+                  <option value="">Select</option>
                   <option value="M">Male</option>
                   <option value="F">Female</option>
                 </select>
@@ -483,7 +484,8 @@ export const CheckinStayEditorModal = ({
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-4 h-[420px] overflow-y-auto pr-1">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {roomCards.map(({ room, availableBeds, isFull, roomNeedsCleaning }) => (
                     <button
                       key={room.id}
@@ -527,6 +529,7 @@ export const CheckinStayEditorModal = ({
                       </div>
                     </button>
                   ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -691,6 +694,7 @@ export const CheckinStayEditorModal = ({
                         onChange={(event) => setField('gender', event.target.value as 'M' | 'F')}
                         className="rounded-2xl border-slate-200"
                       >
+                        <option value="">Select</option>
                         <option value="M">Male</option>
                         <option value="F">Female</option>
                       </select>
@@ -768,7 +772,8 @@ export const CheckinStayEditorModal = ({
                   </Button>
                 </div>
 
-                <div className="grid gap-3">
+                <div className="h-[420px] overflow-y-auto pr-1">
+                  <div className="grid gap-3">
                   {roomCards.map(({ room, availableBeds, isFull, roomNeedsCleaning }) => (
                     <button
                       key={room.id}
@@ -802,6 +807,7 @@ export const CheckinStayEditorModal = ({
                       </div>
                     </button>
                   ))}
+                  </div>
                 </div>
               </div>
             ) : null}
