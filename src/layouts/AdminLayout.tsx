@@ -1,5 +1,5 @@
 import { CSSProperties, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Gift, LayoutDashboard, LogOut, Menu, QrCode, Repeat2, Sparkles, Users2, X, FileSpreadsheet } from 'lucide-react'
+import { CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Gift, LogOut, Menu, QrCode, Repeat2, Sparkles, Users2, X, FileSpreadsheet } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { AdminToolbarContext } from '../components/common/AdminToolbar'
 import { AdminHeaderContext } from '../components/common/SectionHeader'
@@ -7,15 +7,14 @@ import { useAppStore, useSessionUser } from '../store/app-store'
 import { cn } from '../utils/cn'
 
 const navItems = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/cleaning-tasks', label: 'Cleaning Tasks', icon: Sparkles },
+  { to: '/admin/cleaners', label: 'Cleaning Staff', icon: Users2 },
+  { to: '/admin/volunteers', label: 'Volunteers', icon: Users2 },
   { to: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
   { to: '/admin/standard-tasks', label: 'Recurring Tasks', icon: Repeat2 },
   { to: '/admin/assignments', label: 'Assignments', icon: CalendarRange },
   { to: '/admin/check-in', label: 'Check-in', icon: QrCode },
   { to: '/admin/tm30', label: 'TM30', icon: FileSpreadsheet },
-  { to: '/admin/volunteers', label: 'Volunteers', icon: Users2 },
-  { to: '/admin/cleaners', label: 'Cleaning Staff', icon: Users2 },
-  { to: '/admin/cleaning-tasks', label: 'Cleaning Tasks', icon: Sparkles },
   { to: '/admin/rewards', label: 'Rewards', icon: Gift },
 ]
 
@@ -180,7 +179,6 @@ export const AdminLayout = () => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === '/admin'}
                   className={({ isActive }) =>
                     cn(
                       'group relative flex items-center overflow-visible rounded-2xl py-3 text-sm font-medium text-white/70 transition',
@@ -237,6 +235,7 @@ export const AdminLayout = () => {
           >
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setMobileNavOpen(true)}
@@ -244,17 +243,27 @@ export const AdminLayout = () => {
                 >
                   <Menu size={18} />
                 </button>
-                <div>
-                  {headerState?.eyebrow ? (
-                    <p className="text-xs uppercase tracking-[0.25em] text-teal">{headerState.eyebrow}</p>
-                  ) : null}
-                  <p className="mt-1 font-display text-2xl font-semibold text-ink">
-                    {headerState?.title ?? 'VolunteerFlow'}
-                  </p>
-                  {headerState?.description ? (
-                    <p className="mt-1 max-w-2xl text-sm text-slate-500">{headerState.description}</p>
-                  ) : null}
-                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  aria-label="Sign out"
+                  title="Sign out"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-soft lg:hidden"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+              <div>
+                {headerState?.eyebrow ? (
+                  <p className="text-xs uppercase tracking-[0.25em] text-teal">{headerState.eyebrow}</p>
+                ) : null}
+                <p className="mt-1 font-display text-2xl font-semibold text-ink">
+                  {headerState?.title ?? 'VolunteerFlow'}
+                </p>
+                {headerState?.description ? (
+                  <p className="mt-1 max-w-2xl text-sm text-slate-500">{headerState.description}</p>
+                ) : null}
+              </div>
               </div>
               {headerState?.action ? <div className="hidden sm:block">{headerState.action}</div> : null}
             </div>
@@ -274,7 +283,7 @@ export const AdminLayout = () => {
             </div>
           ) : null}
           <div
-            className="flex-1 overflow-x-hidden px-4 pb-6 sm:px-6 lg:px-8 lg:pb-6"
+            className="flex-1 overflow-x-hidden px-4 pb-28 sm:px-6 lg:px-8 lg:pb-6"
             style={{ paddingTop: `calc(var(--admin-header-height, 152px) + var(--admin-toolbar-height, 0px) + 1rem)` }}
           >
             <Outlet />
@@ -312,7 +321,6 @@ export const AdminLayout = () => {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.to === '/admin'}
                     onClick={() => setMobileNavOpen(false)}
                     className={({ isActive }) =>
                       cn(
@@ -339,6 +347,41 @@ export const AdminLayout = () => {
           <button type="button" className="absolute inset-0 -z-10" onClick={() => setMobileNavOpen(false)} />
         </div>
       ) : null}
+
+      <nav className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 rounded-[24px] border border-white/60 bg-white/95 p-2 shadow-soft backdrop-blur lg:hidden">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={item.label}
+                aria-label={item.label}
+                className={({ isActive }) =>
+                  cn(
+                    'flex min-w-[56px] flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-semibold',
+                    isActive ? 'bg-ink text-white' : 'text-slate-500',
+                  )
+                }
+              >
+                <Icon size={20} />
+                <span className="max-w-full truncate">{item.label}</span>
+              </NavLink>
+            )
+          })}
+          <button
+            type="button"
+            onClick={logout}
+            title="Sign out"
+            aria-label="Sign out"
+            className="flex min-w-[56px] flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-semibold text-slate-500"
+          >
+            <LogOut size={20} />
+            <span className="max-w-full truncate">Logout</span>
+          </button>
+        </div>
+      </nav>
     </div>
     </AdminToolbarContext.Provider>
     </AdminHeaderContext.Provider>

@@ -8,7 +8,6 @@ import { AdminCleanersPage } from '../pages/admin/AdminCleanersPage'
 import { AdminCheckInPage } from '../pages/admin/AdminCheckInPage'
 import { AdminCleaningTasksPage } from '../pages/admin/AdminCleaningTasksPage'
 import { AdminAssignmentsPage } from '../pages/admin/AdminAssignmentsPage'
-import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage'
 import { AdminRewardsPage } from '../pages/admin/AdminRewardsPage'
 import { AdminRoutineTasksPage } from '../pages/admin/AdminRoutineTasksPage'
 import { AdminTasksPage } from '../pages/admin/AdminTasksPage'
@@ -16,10 +15,8 @@ import { AdminTm30Page } from '../pages/admin/AdminTm30Page'
 import { AdminVolunteerDetailPage } from '../pages/admin/AdminVolunteerDetailPage'
 import { AdminVolunteersPage } from '../pages/admin/AdminVolunteersPage'
 import { LoginPage } from '../pages/auth/LoginPage'
-import { CleaningDashboardPage } from '../pages/cleaning/CleaningDashboardPage'
-import { CleaningMyTasksPage } from '../pages/cleaning/CleaningMyTasksPage'
+import { CleaningHomePage } from '../pages/cleaning/CleaningHomePage'
 import { CleaningProfilePage } from '../pages/cleaning/CleaningProfilePage'
-import { CleaningTasksPage } from '../pages/cleaning/CleaningTasksPage'
 import { VolunteerDashboardPage } from '../pages/volunteer/VolunteerDashboardPage'
 import { VolunteerMyTasksPage } from '../pages/volunteer/VolunteerMyTasksPage'
 import { VolunteerProfilePage } from '../pages/volunteer/VolunteerProfilePage'
@@ -64,7 +61,7 @@ export const AppRouter = () => {
             </RequireRole>
           }
         >
-          <Route index element={<AdminDashboardPage />} />
+          <Route index element={<AdminCleaningTasksPage />} />
           <Route path="tasks" element={<AdminTasksPage />} />
           <Route path="standard-tasks" element={<AdminRoutineTasksPage />} />
           <Route path="assignments" element={<AdminAssignmentsPage />} />
@@ -101,9 +98,9 @@ export const AppRouter = () => {
             </RequireRole>
           }
         >
-          <Route index element={<CleaningDashboardPage />} />
-          <Route path="tasks" element={<CleaningTasksPage />} />
-          <Route path="my-tasks" element={<CleaningMyTasksPage />} />
+          <Route index element={<CleaningHomePage />} />
+          <Route path="tasks" element={<Navigate to="/cleaning" replace />} />
+          <Route path="my-tasks" element={<Navigate to="/cleaning" replace />} />
           <Route path="profile" element={<CleaningProfilePage />} />
         </Route>
 

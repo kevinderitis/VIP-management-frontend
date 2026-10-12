@@ -103,6 +103,11 @@ type AppState = ServerState & {
     isActive?: boolean
   }) => Promise<void>
   upsertCleaningPlaceStatus: (input: CleaningPlaceStatusDraftInput) => Promise<void>
+  bulkUpdateRoomCleaningStatus: (input: {
+    roomCodes: string[]
+    label: string
+    color: string
+  }) => Promise<void>
   bulkCreateBedTasks: (input: {
     selections: BulkBedTaskSelection[]
     assignVolunteerId?: string
@@ -783,6 +788,38 @@ export const useAppStore = create<AppState>((set, get) => ({
           'warning',
         ),
       }))
+    }
+  },
+
+  bulkUpdateRoomCleaningStatus: async (input) => {
+    try {
+      await apiRequest('/cleaning-place-statuses/bulk-room-status', {
+        method: 'POST',
+        token: get().accessToken,
+        body: {
+          roomCodes: input.roomCodes,
+          label: input.label,
+          color: input.color,
+        },
+      })
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Room statuses updated',
+          `${input.roomCodes.length} room(s) moved to "${input.label}". Cleaning tasks were created without assigning a cleaner.`,
+        ),
+      }))
+    } catch (error) {
+      set((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Could not update room statuses',
+          error instanceof Error ? error.message : 'The bulk cleaning update failed.',
+          'warning',
+        ),
+      }))
+      throw error
     }
   },
 

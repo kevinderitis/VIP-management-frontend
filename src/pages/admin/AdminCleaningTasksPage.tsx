@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, Trash2, UserCog, UserPlus } from 'lucide-react'
+import { AlertTriangle, BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
+import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
 import { CleaningTaskAssignmentModal } from '../../components/admin/CleaningTaskAssignmentModal'
@@ -100,6 +101,7 @@ export const AdminCleaningTasksPage = () => {
   const updateCleaningRoom = useAppStore((state) => state.updateCleaningRoom)
   const upsertCleaningPlaceStatus = useAppStore((state) => state.upsertCleaningPlaceStatus)
   const bulkCreateBedTasks = useAppStore((state) => state.bulkCreateBedTasks)
+  const bulkUpdateRoomCleaningStatus = useAppStore((state) => state.bulkUpdateRoomCleaningStatus)
   const resolveBedConflict = useAppStore((state) => state.resolveBedConflict)
   const cleaners = useCleanerUsers()
   const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
@@ -115,6 +117,7 @@ export const AdminCleaningTasksPage = () => {
   const [areaOpen, setAreaOpen] = useState(false)
   const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const [bulkBedOpen, setBulkBedOpen] = useState(false)
+  const [bulkCleaningOpen, setBulkCleaningOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [assignmentTask, setAssignmentTask] = useState<Task | null>(null)
   const [selectedArea, setSelectedArea] = useState<CleaningArea | null>(null)
@@ -320,10 +323,16 @@ export const AdminCleaningTasksPage = () => {
               <ChevronDown size={16} />
             </span>
           </button>
-          <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap">
-            <BedDouble size={15} className="mr-2" />
-            Bulk bed
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setBulkBedOpen(true)} className="whitespace-nowrap">
+              <BedDouble size={15} className="mr-2" />
+              Bulk bed
+            </Button>
+            <Button size="sm" onClick={() => setBulkCleaningOpen(true)} className="whitespace-nowrap">
+              <SprayCan size={15} className="mr-2" />
+              Bulk cleaning
+            </Button>
+          </div>
         </div>
         {roomBoardOpen ? (
           <>
@@ -902,6 +911,20 @@ export const AdminCleaningTasksPage = () => {
           }}
         />
       ) : null}
+
+      <BulkRoomCleaningModal
+        open={bulkCleaningOpen}
+        onClose={() => setBulkCleaningOpen(false)}
+        groups={groupedRooms.map((group) => ({
+          section: group.section,
+          rooms: group.rooms.map(({ room, status }) => ({
+            room,
+            primaryLabel: status.primaryLabel,
+            color: status.color,
+          })),
+        }))}
+        onConfirmStatusChange={(input) => bulkUpdateRoomCleaningStatus(input)}
+      />
 
       <BulkBedTaskModal
         open={bulkBedOpen}

@@ -2,7 +2,7 @@ import { Activity, BellRing, Coffee, Gift, Hotel, ShieldCheck, Sparkles } from '
 import { TaskStatus, UserRole } from '../types/models'
 
 export const roleHomePath: Record<UserRole, string> = {
-  admin: '/admin',
+  admin: '/admin/cleaning-tasks',
   volunteer: '/app',
   cleaner: '/cleaning',
 }
