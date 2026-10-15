@@ -923,6 +923,7 @@ export const AdminCleaningTasksPage = () => {
             color: status.color,
           })),
         }))}
+        cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
         onConfirmStatusChange={(input) => bulkUpdateRoomCleaningStatus(input)}
       />
 

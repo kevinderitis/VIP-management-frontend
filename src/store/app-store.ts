@@ -107,6 +107,7 @@ type AppState = ServerState & {
     roomCodes: string[]
     label: string
     color: string
+    assignCleanerId?: string
   }) => Promise<void>
   bulkCreateBedTasks: (input: {
     selections: BulkBedTaskSelection[]
@@ -122,6 +123,7 @@ type AppState = ServerState & {
   deleteCleaningTask: (taskId: string) => Promise<void>
   assignCleaningTask: (taskId: string, cleanerId: string) => Promise<void>
   takeCleaningTask: (taskId: string) => Promise<void>
+  takeOverCleaningTask: (taskId: string) => Promise<void>
   releaseCleaningTask: (taskId: string) => Promise<void>
   completeCleaningTask: (taskId: string) => Promise<void>
   createReward: (input: RewardDraftInput) => Promise<void>
@@ -800,6 +802,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           roomCodes: input.roomCodes,
           label: input.label,
           color: input.color,
+          assignCleanerId: input.assignCleanerId || undefined,
         },
       })
       await get().refreshState()
@@ -807,7 +810,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         toasts: addToast(
           state.toasts,
           'Room statuses updated',
-          `${input.roomCodes.length} room(s) moved to "${input.label}". Cleaning tasks were created without assigning a cleaner.`,
+          `${input.roomCodes.length} room(s) moved to "${input.label}".`,
         ),
       }))
     } catch (error) {
@@ -969,6 +972,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshState()
     set((state) => ({
       toasts: addToast(state.toasts, 'Cleaning task claimed', 'The task moved into today’s cleaning queue.'),
+    }))
+  },
+
+  takeOverCleaningTask: async (taskId) => {
+    await apiRequest(`/cleaning-tasks/${taskId}/takeover`, {
+      method: 'POST',
+      token: get().accessToken,
+    })
+    await get().refreshState()
+    set((state) => ({
+      toasts: addToast(state.toasts, 'Task added to your list', 'It is now assigned to you.'),
     }))
   },
 

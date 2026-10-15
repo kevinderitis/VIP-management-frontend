@@ -19,6 +19,16 @@ export const getMessengerChatId = () => import.meta.env.VITE_MESSENGER_CHAT_ID ?
 
 export const isMessengerConfigured = () => Boolean(getMessengerToken() && getMessengerChatId())
 
+// Direct link to the Messenger group chat, opened after a cleaner taps DONE.
+// Set VITE_MESSENGER_CHAT_URL (e.g. https://www.messenger.com/t/1234567890).
+// Falls back to messenger.com/t/<chatId> when only the chat id is known.
+export const getMessengerChatUrl = () => {
+  const configured = import.meta.env.VITE_MESSENGER_CHAT_URL as string | undefined
+  if (configured) return configured
+  const chatId = getMessengerChatId()
+  return chatId ? `https://www.messenger.com/t/${chatId}` : ''
+}
+
 export async function sendMessengerMessage(message: string, chatId?: string): Promise<MessengerSendResult> {
   const targetChatId = chatId || getMessengerChatId()
   if (!targetChatId) throw new Error('Missing Messenger chat id. Set VITE_MESSENGER_CHAT_ID.')
