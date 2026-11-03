@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Search, Send } from 'lucide-react'
-import { buildCleaningBroadcastMessage } from '../../lib/cleaning-broadcast'
-import { isMessengerConfigured, sendMessengerMessage } from '../../lib/messenger'
 import { CleaningRoom, User } from '../../types/models'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
@@ -47,7 +45,6 @@ export const BulkRoomCleaningModal = ({
   const [statusColor, setStatusColor] = useState(statusPresets[0].color)
   const [search, setSearch] = useState('')
   const [assignCleanerId, setAssignCleanerId] = useState('')
-  const [sendViaMessenger, setSendViaMessenger] = useState(false)
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
@@ -57,7 +54,6 @@ export const BulkRoomCleaningModal = ({
     setStatusColor(statusPresets[0].color)
     setSearch('')
     setAssignCleanerId('')
-    setSendViaMessenger(false)
     setSending(false)
   }, [open])
 
@@ -113,32 +109,9 @@ export const BulkRoomCleaningModal = ({
       assignCleanerId: assignCleanerId || undefined,
     }
 
-    // Optional Messenger broadcast (no preview). Sent first, then the modal
-    // closes at once and the status change runs in the background.
-    if (sendViaMessenger) {
-      const message = buildCleaningBroadcastMessage(
-        selectedRooms.map((entry) => ({
-          code: entry.room.code,
-          section: entry.room.section,
-          roomType: entry.room.roomType,
-          label: entry.room.label,
-        })),
-        statusLabel,
-      )
-      try {
-        await sendMessengerMessage(message)
-      } catch (error) {
-        try {
-          await navigator.clipboard.writeText(message)
-        } catch {
-          // clipboard may be unavailable; status change still proceeds
-        }
-        console.warn('Messenger send failed, status still updating:', error)
-      }
-    }
-
     onClose()
-    // Fire-and-forget: the store shows its own toast when the refresh lands.
+    // Fire-and-forget: the store updates optimistically and notifies the
+    // Messenger group with the refreshed needs-cleaning list.
     void Promise.resolve(onConfirmStatusChange(payload)).catch((error) => {
       console.warn('Bulk status update failed:', error)
     })
@@ -255,24 +228,8 @@ export const BulkRoomCleaningModal = ({
               ))}
             </select>
             <span className="text-xs font-normal text-slate-500">
-              All selected rooms will be assigned to this cleaner at once.
-            </span>
-          </label>
-
-          <label className="flex cursor-pointer items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={sendViaMessenger}
-              onChange={(event) => setSendViaMessenger(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium">Also send to Messenger group</span>
-              <span className="mt-1 block text-xs text-slate-500">
-                {sendViaMessenger && !isMessengerConfigured()
-                  ? 'Messenger token or chat id is not configured yet.'
-                  : 'Sends the room list to the cleaning group.'}
-              </span>
+              All selected rooms will be assigned to this cleaner at once. The updated
+              cleaning list is sent to the Messenger group automatically.
             </span>
           </label>
 

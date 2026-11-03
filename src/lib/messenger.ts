@@ -30,6 +30,24 @@ export const getMessengerChatUrl = () => {
 }
 
 export async function sendMessengerMessage(message: string, chatId?: string): Promise<MessengerSendResult> {
+  return enqueueMessengerSend(() => performMessengerSend(message, chatId))
+}
+
+let messengerSendQueue: Promise<void> = Promise.resolve()
+
+const enqueueMessengerSend = <T>(task: () => Promise<T>): Promise<T> => {
+  // The Messenger bot drives a single browser page, so sends must run one at
+  // a time. Queueing also keeps the cleaning list ahead of the follow-up
+  // "room is ready" message when both are triggered together.
+  const result = messengerSendQueue.then(task, task)
+  messengerSendQueue = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
+
+async function performMessengerSend(message: string, chatId?: string): Promise<MessengerSendResult> {
   const targetChatId = chatId || getMessengerChatId()
   if (!targetChatId) throw new Error('Missing Messenger chat id. Set VITE_MESSENGER_CHAT_ID.')
   const token = getMessengerToken()

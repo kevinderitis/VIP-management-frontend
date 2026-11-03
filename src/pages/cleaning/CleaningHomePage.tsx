@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Hand, Loader2, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
-import { getMessengerChatUrl, sendMessengerMessage } from '../../lib/messenger'
+import { getMessengerChatUrl } from '../../lib/messenger'
 import { useAppStore, useCleanerUsers, useSessionUser } from '../../store/app-store'
 import { Task } from '../../types/models'
 
@@ -111,26 +111,19 @@ export const CleaningHomePage = () => {
   const handleDone = async (task: Task) => {
     const name = roomName(task)
     setBusyId(task.id)
+    // The store completes the task and then posts the updated cleaning list
+    // plus the "room is ready" message. Keep the loader up until both finish.
+    setSendingMsg({ id: task.id, name })
     try {
       await completeCleaningTask(task.id)
     } catch (error) {
       console.warn('Could not complete cleaning task:', error)
+      setSendingMsg(null)
       setBusyId(null)
       return
     }
     setBusyId(null)
     setInProgress((current) => current.filter((taskId) => taskId !== task.id))
-
-    // Short confirmation to the same Messenger group used for the bulk
-    // broadcast. While it sends, a loader shows instead of the chat card.
-    // If the Messenger API is unavailable, the send is skipped and the flow
-    // continues normally.
-    setSendingMsg({ id: task.id, name })
-    try {
-      await sendMessengerMessage(`✅ ${name} cleaned`)
-    } catch (error) {
-      console.warn('Messenger confirmation skipped:', error)
-    }
     setSendingMsg(null)
     setJustDone((current) => [{ id: task.id, name }, ...current].slice(0, 5))
   }
@@ -149,7 +142,7 @@ export const CleaningHomePage = () => {
       {sendingMsg ? (
         <div className="flex items-center justify-center gap-3 rounded-[28px] border-2 border-teal bg-teal/10 p-5 shadow-soft">
           <Loader2 size={24} className="animate-spin text-teal" />
-          <p className="text-xl font-semibold text-ink">Sending confirmation…</p>
+          <p className="text-xl font-semibold text-ink">Sending update to Messenger…</p>
         </div>
       ) : null}
 
