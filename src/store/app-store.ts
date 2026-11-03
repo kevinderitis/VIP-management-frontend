@@ -122,8 +122,10 @@ type AppState = ServerState & {
   toggleCleaningTaskCancelled: (taskId: string) => Promise<void>
   deleteCleaningTask: (taskId: string) => Promise<void>
   assignCleaningTask: (taskId: string, cleanerId: string) => Promise<void>
+  unassignCleaningTask: (taskId: string) => Promise<void>
   takeCleaningTask: (taskId: string) => Promise<void>
   takeOverCleaningTask: (taskId: string) => Promise<void>
+  startCleaningTask: (taskId: string) => Promise<void>
   releaseCleaningTask: (taskId: string) => Promise<void>
   completeCleaningTask: (taskId: string) => Promise<void>
   createReward: (input: RewardDraftInput) => Promise<void>
@@ -182,6 +184,71 @@ const emptyServerState: ServerState = {
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 const toApiEnum = (value?: string) => value?.replaceAll('-', '_').toUpperCase()
+const needsCleaningLabel = (label?: string) =>
+  ['need cleaning', 'needs cleaning'].includes((label ?? '').trim().toLowerCase())
+const activeCleaningTaskStatuses = ['assigned', 'available', 'scheduled']
+
+const placeStatusKey = (status: CleaningPlaceStatus) =>
+  status.placeType === 'room'
+    ? `room:${status.roomCode ?? status.roomNumber}`
+    : `custom:${status.cleaningAreaId ?? status.placeLabel}`
+
+const applyOptimisticPlaceStatus = (
+  statuses: CleaningPlaceStatus[],
+  input: CleaningPlaceStatusDraftInput,
+): CleaningPlaceStatus[] => {
+  const key =
+    input.placeType === 'room'
+      ? `room:${input.roomCode ?? input.roomNumber}`
+      : `custom:${input.cleaningAreaId ?? input.placeLabel}`
+  const existing = statuses.find((status) => placeStatusKey(status) === key)
+  const next: CleaningPlaceStatus = {
+    id: existing?.id ?? `optimistic-${key}`,
+    placeType: input.placeType,
+    roomNumber: input.roomNumber ?? existing?.roomNumber,
+    roomCode: input.roomCode ?? existing?.roomCode,
+    roomSection: input.roomSection ?? existing?.roomSection,
+    roomType: input.roomType ?? existing?.roomType,
+    cleaningAreaId: input.cleaningAreaId ?? existing?.cleaningAreaId,
+    placeLabel: input.placeLabel || existing?.placeLabel || '',
+    label: input.label,
+    color: input.color,
+    roomServiceLabel: input.placeType === 'room' ? input.label : existing?.roomServiceLabel,
+    roomServiceColor: input.placeType === 'room' ? input.color : existing?.roomServiceColor,
+    trashRequested: input.trashRequested ?? existing?.trashRequested,
+    beds: input.beds ?? existing?.beds ?? [],
+  }
+
+  return existing
+    ? statuses.map((status) => (placeStatusKey(status) === key ? next : status))
+    : [...statuses, next]
+}
+
+const applyOptimisticCleaningTasks = (
+  tasks: Task[],
+  input: { placeType: CleaningPlaceStatusDraftInput['placeType']; roomCode?: string; placeLabel?: string; label: string; assignCleanerId?: string },
+) =>
+  tasks.map((task) => {
+    if (task.audience !== 'cleaning' || !activeCleaningTaskStatuses.includes(task.status)) return task
+    const matches =
+      input.placeType === 'room'
+        ? task.cleaningLocationType === 'room' && task.cleaningRoomCode === input.roomCode
+        : task.cleaningLocationType === 'custom' && task.cleaningLocationLabel === input.placeLabel
+    if (!matches) return task
+
+    if (needsCleaningLabel(input.label)) {
+      if (!input.assignCleanerId) return task
+      return {
+        ...task,
+        assignedTo: input.assignCleanerId,
+        lastAssignedTo: input.assignCleanerId,
+        startedAt: undefined,
+        status: 'assigned' as const,
+      }
+    }
+
+    return { ...task, status: 'cancelled' as const, assignedTo: undefined, startedAt: undefined }
+  })
 
 const readStoredSession = () => ({
   accessToken: window.localStorage.getItem(SESSION_TOKEN_KEY) ?? undefined,
@@ -771,6 +838,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   upsertCleaningPlaceStatus: async (input) => {
+    // Optimistic: the room board recolors on the same tick the modal closes,
+    // then the server response reconciles the canonical state.
+    const previousStatuses = get().cleaningPlaceStatuses
+    const previousTasks = get().tasks
+    set((state) => ({
+      cleaningPlaceStatuses: applyOptimisticPlaceStatus(state.cleaningPlaceStatuses, input),
+      tasks: applyOptimisticCleaningTasks(state.tasks, {
+        placeType: input.placeType,
+        roomCode: input.roomCode,
+        placeLabel: input.placeLabel,
+        label: input.label,
+        assignCleanerId: input.assignCleanerId,
+      }),
+    }))
     try {
       await apiRequest('/cleaning-place-statuses/upsert', {
         method: 'POST',
@@ -783,6 +864,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }))
     } catch (error) {
       set((state) => ({
+        cleaningPlaceStatuses: previousStatuses,
+        tasks: previousTasks,
         toasts: addToast(
           state.toasts,
           'Could not update place status',
@@ -794,6 +877,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   bulkUpdateRoomCleaningStatus: async (input) => {
+    // Optimistic: every selected room changes state before the request
+    // round-trip, including the cleaning tasks tied to those rooms.
+    const previousStatuses = get().cleaningPlaceStatuses
+    const previousTasks = get().tasks
+    const applyRooms = (statuses: CleaningPlaceStatus[]) =>
+      input.roomCodes.reduce(
+        (accumulator, roomCode) =>
+          applyOptimisticPlaceStatus(accumulator, {
+            placeType: 'room',
+            roomCode,
+            placeLabel: roomCode,
+            label: input.label,
+            color: input.color,
+            assignCleanerId: input.assignCleanerId,
+          }),
+        statuses,
+      )
+    set((state) => ({
+      cleaningPlaceStatuses: applyRooms(state.cleaningPlaceStatuses),
+      tasks: input.roomCodes.reduce(
+        (tasks, roomCode) =>
+          applyOptimisticCleaningTasks(tasks, {
+            placeType: 'room',
+            roomCode,
+            label: input.label,
+            assignCleanerId: input.assignCleanerId,
+          }),
+        state.tasks,
+      ),
+    }))
     try {
       await apiRequest('/cleaning-place-statuses/bulk-room-status', {
         method: 'POST',
@@ -815,6 +928,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }))
     } catch (error) {
       set((state) => ({
+        cleaningPlaceStatuses: previousStatuses,
+        tasks: previousTasks,
         toasts: addToast(
           state.toasts,
           'Could not update room statuses',
@@ -953,15 +1068,69 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   assignCleaningTask: async (taskId, cleanerId) => {
-    await apiRequest(`/cleaning-tasks/${taskId}/assign`, {
-      method: 'POST',
-      token: get().accessToken,
-      body: { cleanerId },
-    })
-    await get().refreshState()
+    // Optimistic: the cleaner activity panel reflects the new owner right
+    // away, then the server confirms in the background.
+    const previousTasks = get().tasks
     set((state) => ({
-      toasts: addToast(state.toasts, 'Cleaning task assigned', 'The task was assigned to the selected cleaner.', 'info'),
+      tasks: state.tasks.map((task) =>
+        task.id === taskId ? { ...task, assignedTo: cleanerId, startedAt: undefined } : task,
+      ),
     }))
+    try {
+      await apiRequest(`/cleaning-tasks/${taskId}/assign`, {
+        method: 'POST',
+        token: get().accessToken,
+        body: { cleanerId },
+      })
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(state.toasts, 'Cleaning task assigned', 'The task was assigned to the selected cleaner.', 'info'),
+      }))
+    } catch (error) {
+      set((state) => ({
+        tasks: previousTasks,
+        toasts: addToast(
+          state.toasts,
+          'Could not reassign the task',
+          error instanceof Error ? error.message : 'The cleaner assignment failed.',
+          'warning',
+        ),
+      }))
+      throw error
+    }
+  },
+
+  unassignCleaningTask: async (taskId) => {
+    // Optimistic: drop the cleaner from the activity panel instantly.
+    const previousTasks = get().tasks
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, assignedTo: undefined, startedAt: undefined, status: 'available' as const }
+          : task,
+      ),
+    }))
+    try {
+      await apiRequest(`/cleaning-tasks/${taskId}/unassign`, {
+        method: 'POST',
+        token: get().accessToken,
+      })
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(state.toasts, 'Assignment removed', 'The room was returned to the cleaning board.', 'info'),
+      }))
+    } catch (error) {
+      set((state) => ({
+        tasks: previousTasks,
+        toasts: addToast(
+          state.toasts,
+          'Could not remove the assignment',
+          error instanceof Error ? error.message : 'The cleaning task assignment failed.',
+          'warning',
+        ),
+      }))
+      throw error
+    }
   },
 
   takeCleaningTask: async (taskId) => {
@@ -984,6 +1153,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       toasts: addToast(state.toasts, 'Task added to your list', 'It is now assigned to you.'),
     }))
+  },
+
+  startCleaningTask: async (taskId) => {
+    await apiRequest(`/cleaning-tasks/${taskId}/start`, {
+      method: 'POST',
+      token: get().accessToken,
+    })
+    await get().refreshState()
   },
 
   releaseCleaningTask: async (taskId) => {

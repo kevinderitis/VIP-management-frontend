@@ -67,6 +67,7 @@ export interface Task {
   publishedAt: string
   scheduledAt?: string
   endsAt?: string
+  startedAt?: string
   assignedTo?: string
   lastAssignedTo?: string
   createdBy: string

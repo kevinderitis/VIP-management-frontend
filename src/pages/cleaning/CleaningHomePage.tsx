@@ -24,6 +24,7 @@ export const CleaningHomePage = () => {
   const cleaners = useCleanerUsers()
   const takeCleaningTask = useAppStore((state) => state.takeCleaningTask)
   const takeOverCleaningTask = useAppStore((state) => state.takeOverCleaningTask)
+  const startCleaningTask = useAppStore((state) => state.startCleaningTask)
   const releaseCleaningTask = useAppStore((state) => state.releaseCleaningTask)
   const completeCleaningTask = useAppStore((state) => state.completeCleaningTask)
 
@@ -88,6 +89,20 @@ export const CleaningHomePage = () => {
     try {
       await action()
       setInProgress((current) => current.filter((taskId) => taskId !== id))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleStart = async (task: Task) => {
+    // Local flag keeps the cleaner UI instant; the server flag is what the
+    // admin panel reads to show this task as in progress.
+    setInProgress((current) => (current.includes(task.id) ? current : [...current, task.id]))
+    setBusyId(task.id)
+    try {
+      await startCleaningTask(task.id)
+    } catch (error) {
+      console.warn('Could not sync start state with the server:', error)
     } finally {
       setBusyId(null)
     }
@@ -169,7 +184,7 @@ export const CleaningHomePage = () => {
       {myTasks.length > 0 ? (
         <div className="grid gap-4">
           {myTasks.map((task) => {
-            const started = inProgress.includes(task.id)
+            const started = inProgress.includes(task.id) || Boolean(task.startedAt)
             const busy = busyId === task.id
             return (
               <div
@@ -196,7 +211,7 @@ export const CleaningHomePage = () => {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => setInProgress((current) => [...current, task.id])}
+                    onClick={() => void handleStart(task)}
                     className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-xl font-bold text-white active:scale-[0.99]"
                   >
                     <Play size={22} /> START

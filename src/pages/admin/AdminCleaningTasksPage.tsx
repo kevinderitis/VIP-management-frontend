@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BedDouble, ChevronDown, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus } from 'lucide-react'
+import { AlertTriangle, BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
+import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
 import { CleaningAreaEditorModal } from '../../components/admin/CleaningAreaEditorModal'
 import { CleaningPlaceStatusModal } from '../../components/admin/CleaningPlaceStatusModal'
 import { CleaningTaskAssignmentModal } from '../../components/admin/CleaningTaskAssignmentModal'
@@ -25,13 +26,23 @@ const activeTaskStatuses = ['assigned', 'available', 'scheduled']
 
 const normalizeLabel = (value?: string) => value?.trim().toLowerCase() ?? ''
 
+const roomStatePresets: Record<string, { label: string; color: string }> = {
+  clean: { label: 'Clean', color: '#22c55e' },
+  'needs cleaning': { label: 'Needs cleaning', color: '#ef4444' },
+  'need cleaning': { label: 'Needs cleaning', color: '#ef4444' },
+  occupied: { label: 'Occupied', color: '#3b82f6' },
+  'in progress': { label: 'In progress', color: '#f59e0b' },
+}
+
 const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceStatus | undefined, relatedTasks: Task[]) => {
   const activeTasks = relatedTasks.filter((task) => activeTaskStatuses.includes(task.status))
   const activeBedTasks = activeTasks.filter((task) => task.bedTask)
   const activeCleaningTask = activeTasks.find((task) => task.audience === 'cleaning')
+  const cleaningStarted = Boolean(activeCleaningTask?.startedAt)
 
   const bedLabels = customStatus?.beds.map((bed) => normalizeLabel(bed.label)) ?? []
   const roomServiceLabel = normalizeLabel(customStatus?.roomServiceLabel)
+  const explicitState = roomStatePresets[roomServiceLabel]
 
   const hasOccupied = bedLabels.includes('occupied')
   const hasNeedsMaking =
@@ -43,33 +54,56 @@ const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceSta
   const hasNeedsCleaning =
     roomServiceLabel === 'needs cleaning' ||
     roomServiceLabel === 'need cleaning' ||
-    Boolean(activeCleaningTask)
+    Boolean(activeCleaningTask && !cleaningStarted)
 
   const badges: Array<{ label: string; color: string }> = []
   const occupiedCount = customStatus?.beds.filter((bed) => normalizeLabel(bed.label) === 'occupied').length ?? 0
   const needsMakingCount =
     customStatus?.beds.filter((bed) => normalizeLabel(bed.label) === 'needs making').length ?? 0
 
+  const pushBadge = (badge: { label: string; color: string }) => {
+    if (!badges.some((current) => normalizeLabel(current.label) === normalizeLabel(badge.label))) {
+      badges.push(badge)
+    }
+  }
+
   if (hasOccupied) {
-    badges.push({ label: occupiedCount > 0 ? `${occupiedCount} Occupied` : 'Occupied', color: '#3b82f6' })
+    pushBadge({ label: occupiedCount > 0 ? `${occupiedCount} Occupied` : 'Occupied', color: '#3b82f6' })
   }
   if (hasNeedsMaking) {
-    badges.push({ label: needsMakingCount > 0 ? `${needsMakingCount} Needs making` : 'Needs making', color: '#ef4444' })
+    pushBadge({ label: needsMakingCount > 0 ? `${needsMakingCount} Needs making` : 'Needs making', color: '#ef4444' })
   }
   if (hasCheck) {
-    badges.push({ label: 'Check', color: '#f59e0b' })
+    pushBadge({ label: 'Check', color: '#f59e0b' })
   }
   if (hasNeedsCleaning) {
-    badges.push({ label: 'Needs cleaning', color: '#ef4444' })
+    pushBadge({ label: 'Needs cleaning', color: '#ef4444' })
+  } else if (cleaningStarted) {
+    pushBadge({ label: 'In progress', color: '#f59e0b' })
+  }
+  if (explicitState && explicitState.label !== 'Clean') {
+    // "2 Occupied" already covers the occupied state, and needs cleaning /
+    // in progress have their own badge above.
+    const alreadyCovered =
+      (explicitState.label === 'Occupied' && hasOccupied) ||
+      (explicitState.label === 'Needs cleaning' && hasNeedsCleaning) ||
+      (explicitState.label === 'In progress' && cleaningStarted)
+    if (!alreadyCovered) pushBadge(explicitState)
   }
 
-  if (!badges.length) {
-    badges.push({ label: 'Clean', color: '#22c55e' })
-  }
+  const explicitPrimary = explicitState && explicitState.label !== 'Clean' ? explicitState : null
+  const primary =
+    cleaningStarted
+      ? { label: 'In progress', color: '#f59e0b' }
+      : hasNeedsCleaning
+        ? { label: 'Needs cleaning', color: '#ef4444' }
+        : (explicitPrimary ?? badges[0] ?? { label: 'Clean', color: '#22c55e' })
+
+  if (!badges.length) pushBadge(primary)
 
   return {
-    color: badges[0].color,
-    primaryLabel: badges[0].label,
+    color: primary.color,
+    primaryLabel: primary.label,
     badges,
     beds: customStatus?.beds ?? [],
     roomType: customStatus?.roomType ?? room.roomType,
@@ -93,6 +127,7 @@ export const AdminCleaningTasksPage = () => {
   const toggleCleaningTaskCancelled = useAppStore((state) => state.toggleCleaningTaskCancelled)
   const deleteCleaningTask = useAppStore((state) => state.deleteCleaningTask)
   const assignCleaningTask = useAppStore((state) => state.assignCleaningTask)
+  const unassignCleaningTask = useAppStore((state) => state.unassignCleaningTask)
   const createCleaningArea = useAppStore((state) => state.createCleaningArea)
   const updateCleaningArea = useAppStore((state) => state.updateCleaningArea)
   const toggleCleaningArea = useAppStore((state) => state.toggleCleaningArea)
@@ -128,6 +163,7 @@ export const AdminCleaningTasksPage = () => {
   const [openAreaManageId, setOpenAreaManageId] = useState<string | null>(null)
   const [openTaskManageId, setOpenTaskManageId] = useState<string | null>(null)
   const [roomBoardOpen, setRoomBoardOpen] = useState(true)
+  const [cleanerActivityOpen, setCleanerActivityOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
   const [bedConflictsOpen, setBedConflictsOpen] = useState(true)
   const [bedConflictsPage, setBedConflictsPage] = useState(1)
@@ -209,10 +245,13 @@ export const AdminCleaningTasksPage = () => {
         const relatedTasks = cleaningTasks.filter(
           (task) => task.cleaningLocationType === 'custom' && task.cleaningLocationLabel === area.name,
         )
+        const activeTask = relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
         const status =
           customStatus ??
-          (relatedTasks.find((task) => ['assigned', 'available', 'scheduled'].includes(task.status))
-            ? { label: 'Needs cleaning', color: '#ef4444', beds: [] }
+          (activeTask
+            ? activeTask.startedAt
+              ? { label: 'In progress', color: '#f59e0b', beds: [] }
+              : { label: 'Needs cleaning', color: '#ef4444', beds: [] }
             : fallbackStatus)
 
         return { area, status }
@@ -272,6 +311,18 @@ export const AdminCleaningTasksPage = () => {
     setNewRoom({ code: '', section: 'Arena Hostel', roomType: 'private', bedCount: 4 })
   }
 
+  const handleRemoveCleanerAssignment = async (task: Task, state: 'Clean' | 'Occupied') => {
+    if (task.cleaningRoomCode) {
+      await bulkUpdateRoomCleaningStatus({
+        roomCodes: [task.cleaningRoomCode],
+        label: state,
+        color: state === 'Clean' ? '#22c55e' : '#3b82f6',
+      })
+      return
+    }
+    await unassignCleaningTask(task.id)
+  }
+
   return (
     <div className="grid min-w-0 gap-6 overflow-x-hidden">
       <SectionHeader
@@ -310,7 +361,12 @@ export const AdminCleaningTasksPage = () => {
         }
       />
 
-      <Panel className="overflow-hidden p-6">
+      <div
+        className={`grid min-w-0 gap-6 ${
+          cleanerActivityOpen ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start' : ''
+        }`}
+      >
+        <Panel className="overflow-hidden p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -331,6 +387,15 @@ export const AdminCleaningTasksPage = () => {
             <Button size="sm" onClick={() => setBulkCleaningOpen(true)} className="whitespace-nowrap">
               <SprayCan size={15} className="mr-2" />
               Bulk cleaning
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setCleanerActivityOpen((current) => !current)}
+              className="whitespace-nowrap"
+            >
+              {cleanerActivityOpen ? <EyeOff size={15} className="mr-2" /> : <Eye size={15} className="mr-2" />}
+              {cleanerActivityOpen ? 'Hide cleaners' : 'Show cleaners'}
             </Button>
           </div>
         </div>
@@ -434,7 +499,17 @@ export const AdminCleaningTasksPage = () => {
             </div>
           </>
         ) : null}
-      </Panel>
+        </Panel>
+
+        {cleanerActivityOpen ? (
+          <CleanerActivityPanel
+            tasks={tasks}
+            cleaners={cleaners}
+            onReassign={(taskId, cleanerId) => assignCleaningTask(taskId, cleanerId)}
+            onRemove={handleRemoveCleanerAssignment}
+          />
+        ) : null}
+      </div>
 
       <Panel className="p-6">
         <div className="flex items-center justify-between gap-4">
@@ -821,7 +896,7 @@ export const AdminCleaningTasksPage = () => {
       )}
 
       <CleaningTaskEditorModal
-        key={`${selectedTask?.id ?? 'new'}-${modalOpen ? 'open' : 'closed'}`}
+        key={`task-editor-${selectedTask?.id ?? 'new'}-${modalOpen ? 'open' : 'closed'}`}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         task={selectedTask}
@@ -837,7 +912,7 @@ export const AdminCleaningTasksPage = () => {
       />
 
       <CleaningTaskAssignmentModal
-        key={`${assignmentTask?.id ?? 'none'}-${assignmentOpen ? 'open' : 'closed'}`}
+        key={`task-assignment-${assignmentTask?.id ?? 'none'}-${assignmentOpen ? 'open' : 'closed'}`}
         open={assignmentOpen}
         onClose={() => setAssignmentOpen(false)}
         task={assignmentTask}
@@ -848,7 +923,7 @@ export const AdminCleaningTasksPage = () => {
       />
 
       <CleaningAreaEditorModal
-        key={`${selectedArea?.id ?? 'new'}-${areaOpen ? 'open' : 'closed'}`}
+        key={`area-editor-${selectedArea?.id ?? 'new'}-${areaOpen ? 'open' : 'closed'}`}
         open={areaOpen}
         onClose={() => setAreaOpen(false)}
         area={selectedArea}
@@ -863,7 +938,7 @@ export const AdminCleaningTasksPage = () => {
 
       {selectedPlace ? (
         <CleaningPlaceStatusModal
-          key={`${selectedPlace.placeType}-${selectedPlace.roomCode ?? selectedPlace.cleaningAreaId ?? selectedPlace.placeLabel}`}
+          key={`place-status-${selectedPlace.placeType}-${selectedPlace.roomCode ?? selectedPlace.cleaningAreaId ?? selectedPlace.placeLabel}`}
           open={statusModalOpen}
           onClose={() => setStatusModalOpen(false)}
           place={selectedPlace}
@@ -875,7 +950,7 @@ export const AdminCleaningTasksPage = () => {
 
       {selectedRoom ? (
         <RoomStatusModal
-          key={`${selectedRoom.id}-${roomModalOpen ? 'open' : 'closed'}`}
+          key={`room-status-${selectedRoom.id}-${roomModalOpen ? 'open' : 'closed'}`}
           open={roomModalOpen}
           onClose={() => setRoomModalOpen(false)}
           room={selectedRoom}
@@ -897,6 +972,10 @@ export const AdminCleaningTasksPage = () => {
             await refreshState()
           }}
           onSubmit={async (input, roomConfig) => {
+            // Run the status update first so its optimistic state lands before
+            // the room refresh, otherwise the board briefly reverts to the
+            // previous color while the structural update is in flight.
+            await upsertCleaningPlaceStatus(input)
             await updateCleaningRoom(selectedRoom.id, {
               code: selectedRoom.code,
               section: selectedRoom.section,
@@ -907,7 +986,6 @@ export const AdminCleaningTasksPage = () => {
               trashTaskPoints: roomConfig.trashTaskPoints,
               isActive: selectedRoom.isActive,
             })
-            await upsertCleaningPlaceStatus(input)
           }}
         />
       ) : null}

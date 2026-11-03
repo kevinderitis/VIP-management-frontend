@@ -6,7 +6,8 @@ import { Modal } from '../common/Modal'
 const presets = [
   { label: 'Clean', color: '#22c55e' },
   { label: 'Needs cleaning', color: '#ef4444' },
-  { label: 'In progress', color: '#3b82f6' },
+  { label: 'Occupied', color: '#3b82f6' },
+  { label: 'In progress', color: '#f59e0b' },
 ]
 
 export const CleaningPlaceStatusModal = ({
