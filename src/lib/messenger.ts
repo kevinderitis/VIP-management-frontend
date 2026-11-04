@@ -45,14 +45,14 @@ export async function isMessengerReachable(timeoutMs = 1800): Promise<boolean> {
   }
 }
 
-// Direct link to the Messenger group chat, opened after a cleaner taps DONE.
-// Set VITE_MESSENGER_CHAT_URL (e.g. https://www.messenger.com/t/1234567890).
-// Falls back to messenger.com/t/<chatId> when only the chat id is known.
+// Direct link to the Messenger cleaning group, opened from the cleaner app.
+// VITE_MESSENGER_CHAT_URL can override it; otherwise it defaults to the group
+// the team uses for cleaning updates.
+const DEFAULT_MESSENGER_CHAT_URL = 'https://www.messenger.com/t/1674818464198016'
+
 export const getMessengerChatUrl = () => {
-  const configured = import.meta.env.VITE_MESSENGER_CHAT_URL as string | undefined
-  if (configured) return configured
-  const chatId = getMessengerChatId()
-  return chatId ? `https://www.messenger.com/t/${chatId}` : ''
+  const configured = (import.meta.env.VITE_MESSENGER_CHAT_URL as string | undefined)?.trim()
+  return configured || DEFAULT_MESSENGER_CHAT_URL
 }
 
 export async function sendMessengerMessage(message: string, chatId?: string): Promise<MessengerSendResult> {
