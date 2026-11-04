@@ -48,37 +48,57 @@ const sendBoardUpdate = async (
   board: CleaningBroadcastBoard,
   completedTasks: CleaningTaskSnapshot[],
 ) => {
+  // When the last room/place on the list is cleaned, the updated list would be
+  // empty. Skip that message and only confirm that the room is ready, so the
+  // group does not receive an empty cleaning request.
+  const hasPendingItems = board.rooms.length > 0 || board.places.length > 0
+  const shouldSendList = hasPendingItems || completedTasks.length === 0
+  const listSkipped = !shouldSendList
+
   let listSent = false
-  try {
-    await sendMessengerMessage(buildCleaningBroadcastMessage(board, 'Needs cleaning'))
-    listSent = true
-    pushToast(
-      'Cleaning list sent',
-      'The Messenger group received the updated cleaning list.',
-    )
-  } catch (error) {
-    pushToast(
-      'Messenger message failed',
-      error instanceof Error ? error.message : 'The Messenger group could not be notified.',
-      'warning',
-    )
+  if (shouldSendList) {
+    try {
+      await sendMessengerMessage(buildCleaningBroadcastMessage(board, 'Needs cleaning'))
+      listSent = true
+      pushToast(
+        'Cleaning list sent',
+        'The Messenger group received the updated cleaning list.',
+      )
+    } catch (error) {
+      pushToast(
+        'Messenger message failed',
+        error instanceof Error ? error.message : 'The Messenger group could not be notified.',
+        'warning',
+      )
+    }
   }
 
   let readyFailed = false
+  let readySent = 0
   for (const task of completedTasks) {
     try {
       await sendMessengerMessage(buildRoomReadyMessage(task.label))
+      readySent += 1
     } catch (error) {
       readyFailed = true
       console.warn('Messenger ready message skipped:', error)
     }
   }
 
-  if (readyFailed && listSent) {
+  if (readyFailed) {
     pushToast(
       'Ready message failed',
-      'The updated list was sent, but one or more ready confirmations did not go through.',
+      listSent
+        ? 'The updated list was sent, but one or more ready confirmations did not go through.'
+        : 'The room ready confirmation could not be sent to the Messenger group.',
       'warning',
+    )
+  } else if (listSkipped && readySent > 0) {
+    // The list was skipped because it would be empty; confirm that the ready
+    // message did reach the group.
+    pushToast(
+      'Room ready sent',
+      'The Messenger group received the ready confirmation.',
     )
   }
 }
