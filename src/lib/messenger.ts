@@ -19,6 +19,32 @@ export const getMessengerChatId = () => import.meta.env.VITE_MESSENGER_CHAT_ID ?
 
 export const isMessengerConfigured = () => Boolean(getMessengerToken() && getMessengerChatId())
 
+// Only the device where the Messenger bot is reachable should send. The
+// admin PC runs the bot on localhost; cleaner phones fail this probe and stay
+// quiet, while still receiving state updates for the UI.
+export async function isMessengerReachable(timeoutMs = 1800): Promise<boolean> {
+  let healthUrl: string
+  try {
+    healthUrl = `${new URL(MESSENGER_API_URL).origin}/health`
+  } catch {
+    return false
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(healthUrl, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 // Direct link to the Messenger group chat, opened after a cleaner taps DONE.
 // Set VITE_MESSENGER_CHAT_URL (e.g. https://www.messenger.com/t/1234567890).
 // Falls back to messenger.com/t/<chatId> when only the chat id is known.

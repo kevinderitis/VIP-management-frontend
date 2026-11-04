@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { NotificationPermissionBanner } from './components/common/NotificationPermissionBanner'
 import { ToastViewport } from './components/common/ToastViewport'
+import { useCleaningMessengerBridge } from './hooks/useCleaningMessengerBridge'
 import { useOfficeCallNotifications } from './hooks/useOfficeCallNotifications'
 import { usePwaNotifications } from './hooks/usePwaNotifications'
 import { useRealtimeSimulation } from './hooks/useRealtimeSimulation'
@@ -16,6 +17,7 @@ function App() {
   useRealtimeSimulation()
   useTaskNotifications()
   useOfficeCallNotifications()
+  useCleaningMessengerBridge()
 
   useEffect(() => {
     void initializeApp()

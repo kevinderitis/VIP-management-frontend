@@ -1,10 +1,19 @@
-import { CleaningPlaceStatus, CleaningRoom, Task } from '../types/models'
+import { CleaningArea, CleaningPlaceStatus, CleaningRoom, Task } from '../types/models'
 
 export interface BroadcastRoomInfo {
   code: string
   section: string
   roomType: CleaningRoom['roomType']
   label: string
+}
+
+export interface BroadcastPlaceInfo {
+  name: string
+}
+
+export interface CleaningBroadcastBoard {
+  rooms: BroadcastRoomInfo[]
+  places: BroadcastPlaceInfo[]
 }
 
 const ACTIVE_CLEANING_TASK_STATUSES: Task['status'][] = ['assigned', 'available', 'scheduled']
@@ -60,47 +69,96 @@ export function collectRoomsNeedingCleaning(
     }))
 }
 
-export const needsCleaningSignature = (rooms: BroadcastRoomInfo[]) =>
-  rooms
-    .map((room) => room.code)
+// Same rule as the custom-place cards: the saved custom status wins. When a
+// place has no saved status, an unstarted cleaning task still puts it on the
+// list.
+export function collectPlacesNeedingCleaning(
+  areas: CleaningArea[],
+  statuses: CleaningPlaceStatus[],
+  tasks: Task[],
+  options?: { excludePlaceNames?: string[] },
+): BroadcastPlaceInfo[] {
+  const excluded = new Set(options?.excludePlaceNames ?? [])
+
+  return areas
+    .filter((area) => {
+      if (!area.isActive || excluded.has(area.name)) return false
+
+      const status = statuses.find(
+        (entry) =>
+          entry.placeType === 'custom' &&
+          (entry.cleaningAreaId === area.id || entry.placeLabel === area.name),
+      )
+      const activeTask = tasks.find(
+        (task) =>
+          task.audience === 'cleaning' &&
+          task.cleaningLocationType === 'custom' &&
+          task.cleaningLocationLabel === area.name &&
+          ACTIVE_CLEANING_TASK_STATUSES.includes(task.status),
+      )
+
+      if (activeTask?.startedAt) return false
+      if (status) return isNeedsCleaningLabel(status.label)
+
+      return Boolean(activeTask)
+    })
+    .map((area) => ({ name: area.name }))
+}
+
+export const cleaningBoardSignature = (board: CleaningBroadcastBoard) =>
+  [
+    ...board.rooms.map((room) => `room:${room.code}`),
+    ...board.places.map((place) => `place:${place.name}`),
+  ]
     .sort()
     .join('|')
 
 export function buildCleaningBroadcastMessage(
-  rooms: BroadcastRoomInfo[],
+  board: CleaningBroadcastBoard,
   statusLabel = 'Needs cleaning',
   date = new Date(),
 ): string {
-  const sorted = [...rooms].sort((a, b) =>
-    a.section.localeCompare(b.section) || a.code.localeCompare(b.code),
+  const rooms = [...board.rooms].sort(
+    (a, b) => a.section.localeCompare(b.section) || a.code.localeCompare(b.code),
   )
+  const places = [...board.places].sort((a, b) => a.name.localeCompare(b.name))
   const lines: string[] = []
   lines.push('🧹 CLEANING REQUEST')
   lines.push(`📅 ${formatBroadcastDate(date)} — Status: ${statusLabel}`)
   lines.push('')
 
-  if (!sorted.length) {
-    lines.push('No rooms need cleaning right now. 🎉')
+  if (!rooms.length && !places.length) {
+    lines.push('No rooms or places need cleaning right now. 🎉')
     return lines.join('\n')
   }
 
-  lines.push(`Rooms to clean (${sorted.length}):`)
+  if (rooms.length) {
+    lines.push(`Rooms to clean (${rooms.length}):`)
 
-  let currentSection = ''
-  let counter = 0
-  for (const room of sorted) {
-    counter += 1
-    if (room.section !== currentSection) {
-      currentSection = room.section
-      lines.push('')
-      lines.push(`📍 ${currentSection}`)
+    let currentSection = ''
+    let counter = 0
+    for (const room of rooms) {
+      counter += 1
+      if (room.section !== currentSection) {
+        currentSection = room.section
+        lines.push('')
+        lines.push(`📍 ${currentSection}`)
+      }
+      const detail = room.roomType === 'shared' ? 'Shared dorm' : 'Private'
+      lines.push(`${counter}. Room ${room.code} — ${detail}`)
     }
-    const detail = room.roomType === 'shared' ? 'Shared dorm' : 'Private'
-    lines.push(`${counter}. Room ${room.code} — ${detail}`)
+  }
+
+  if (places.length) {
+    if (rooms.length) lines.push('')
+    lines.push(`Places to clean (${places.length}):`)
+    places.forEach((place, index) => {
+      lines.push(`${index + 1}. ${place.name}`)
+    })
   }
 
   lines.push('')
-  lines.push('Please confirm here when each room is done. Thank you! 🙏')
+  lines.push('Please confirm here when each room or place is done. Thank you! 🙏')
   return lines.join('\n')
 }
 

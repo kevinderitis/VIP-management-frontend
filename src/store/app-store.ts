@@ -2,14 +2,6 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { ApiError, apiRequest } from '../lib/api'
 import {
-  BroadcastRoomInfo,
-  buildCleaningBroadcastMessage,
-  buildRoomReadyMessage,
-  collectRoomsNeedingCleaning,
-  needsCleaningSignature,
-} from '../lib/cleaning-broadcast'
-import { isMessengerConfigured, sendMessengerMessage } from '../lib/messenger'
-import {
   ActivityItem,
   ActiveStay,
   BulkBedTaskSelection,
@@ -196,15 +188,6 @@ const needsCleaningLabel = (label?: string) =>
   ['need cleaning', 'needs cleaning'].includes((label ?? '').trim().toLowerCase())
 const activeCleaningTaskStatuses = ['assigned', 'available', 'scheduled']
 
-const sendNeedsCleaningList = async (rooms: BroadcastRoomInfo[]) => {
-  if (!isMessengerConfigured()) return false
-  await sendMessengerMessage(buildCleaningBroadcastMessage(rooms, 'Needs cleaning'))
-  return true
-}
-
-const cleaningTaskRoomLabel = (task: Task) =>
-  task.cleaningRoomCode ? `Room ${task.cleaningRoomCode}` : (task.cleaningLocationLabel ?? task.title)
-
 const placeStatusKey = (status: CleaningPlaceStatus) =>
   status.placeType === 'room'
     ? `room:${status.roomCode ?? status.roomNumber}`
@@ -286,7 +269,7 @@ const persistSession = (accessToken?: string, sessionUserId?: string) => {
   }
 }
 
-const addToast = (
+export const addToast = (
   toasts: ToastItem[],
   title: string,
   message: string,
@@ -859,11 +842,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     // then the server response reconciles the canonical state.
     const previousStatuses = get().cleaningPlaceStatuses
     const previousTasks = get().tasks
-    const beforeList = collectRoomsNeedingCleaning(
-      get().cleaningRooms,
-      get().cleaningPlaceStatuses,
-      get().tasks,
-    )
     set((state) => ({
       cleaningPlaceStatuses: applyOptimisticPlaceStatus(state.cleaningPlaceStatuses, input),
       tasks: applyOptimisticCleaningTasks(state.tasks, {
@@ -881,62 +859,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: mapCleaningPlaceStatusInput(input),
       })
       await get().refreshState()
-
-      const afterList = collectRoomsNeedingCleaning(
-        get().cleaningRooms,
-        get().cleaningPlaceStatuses,
-        get().tasks,
-      )
-      const listChanged =
-        input.placeType === 'room' &&
-        needsCleaningSignature(beforeList) !== needsCleaningSignature(afterList)
-
-      if (listChanged && isMessengerConfigured()) {
-        // Success is only reported once Messenger confirms the send. The UI
-        // already shows the new room state optimistically, so this does not
-        // hold up the board or the modal.
-        void (async () => {
-          try {
-            await sendNeedsCleaningList(afterList)
-            set((state) => ({
-              toasts: addToast(
-                state.toasts,
-                'Place status updated',
-                'The updated needs-cleaning list was sent to the Messenger group.',
-              ),
-            }))
-          } catch (error) {
-            set((state) => ({
-              toasts: addToast(
-                state.toasts,
-                'Messenger message failed',
-                `Room status was saved, but the Messenger group was not notified: ${
-                  error instanceof Error ? error.message : 'unknown error'
-                }`,
-                'warning',
-              ),
-            }))
-          }
-        })()
-        return
-      }
-
       set((state) => ({
         toasts: addToast(state.toasts, 'Place status updated', 'The cleaning map reflects the new status color immediately.', 'info'),
       }))
-
-      if (listChanged) {
-        void sendNeedsCleaningList(afterList).catch((error) => {
-          set((state) => ({
-            toasts: addToast(
-              state.toasts,
-              'Messenger message failed',
-              error instanceof Error ? error.message : 'The Messenger group could not be notified.',
-              'warning',
-            ),
-          }))
-        })
-      }
     } catch (error) {
       set((state) => ({
         cleaningPlaceStatuses: previousStatuses,
@@ -956,11 +881,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     // round-trip, including the cleaning tasks tied to those rooms.
     const previousStatuses = get().cleaningPlaceStatuses
     const previousTasks = get().tasks
-    const beforeList = collectRoomsNeedingCleaning(
-      get().cleaningRooms,
-      get().cleaningPlaceStatuses,
-      get().tasks,
-    )
     const applyRooms = (statuses: CleaningPlaceStatus[]) =>
       input.roomCodes.reduce(
         (accumulator, roomCode) =>
@@ -999,60 +919,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       })
       await get().refreshState()
-
-      const afterList = collectRoomsNeedingCleaning(
-        get().cleaningRooms,
-        get().cleaningPlaceStatuses,
-        get().tasks,
-      )
-      const listChanged = needsCleaningSignature(beforeList) !== needsCleaningSignature(afterList)
-      const successMessage = `${input.roomCodes.length} room(s) moved to "${input.label}".`
-
-      if (listChanged && isMessengerConfigured()) {
-        // Report success only after Messenger confirms the send. Room colors
-        // already updated optimistically before this point.
-        void (async () => {
-          try {
-            await sendNeedsCleaningList(afterList)
-            set((state) => ({
-              toasts: addToast(
-                state.toasts,
-                'Room statuses updated',
-                `${successMessage} The updated needs-cleaning list was sent to the Messenger group.`,
-              ),
-            }))
-          } catch (error) {
-            set((state) => ({
-              toasts: addToast(
-                state.toasts,
-                'Messenger message failed',
-                `Room statuses were saved, but the Messenger group was not notified: ${
-                  error instanceof Error ? error.message : 'unknown error'
-                }`,
-                'warning',
-              ),
-            }))
-          }
-        })()
-        return
-      }
-
       set((state) => ({
-        toasts: addToast(state.toasts, 'Room statuses updated', successMessage),
+        toasts: addToast(
+          state.toasts,
+          'Room statuses updated',
+          `${input.roomCodes.length} room(s) moved to "${input.label}".`,
+        ),
       }))
-
-      if (listChanged) {
-        void sendNeedsCleaningList(afterList).catch((error) => {
-          set((state) => ({
-            toasts: addToast(
-              state.toasts,
-              'Messenger message failed',
-              error instanceof Error ? error.message : 'The Messenger group could not be notified.',
-              'warning',
-            ),
-          }))
-        })
-      }
     } catch (error) {
       set((state) => ({
         cleaningPlaceStatuses: previousStatuses,
@@ -1302,52 +1175,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   completeCleaningTask: async (taskId) => {
-    const completedTask = get().tasks.find((task) => task.id === taskId)
     await apiRequest(`/cleaning-tasks/${taskId}/complete`, {
       method: 'POST',
       token: get().accessToken,
     })
     await get().refreshState()
-
-    // Every DONE sends the updated cleaning list first (without the room that
-    // was just cleaned) and then the short "room is ready" confirmation.
-    let messengerError: unknown
-    if (completedTask?.audience === 'cleaning' && isMessengerConfigured()) {
-      const remainingRooms = collectRoomsNeedingCleaning(
-        get().cleaningRooms,
-        get().cleaningPlaceStatuses,
-        get().tasks,
-        {
-          excludeRoomCodes: completedTask.cleaningRoomCode
-            ? [completedTask.cleaningRoomCode]
-            : [],
-        },
-      )
-      try {
-        await sendMessengerMessage(buildCleaningBroadcastMessage(remainingRooms, 'Needs cleaning'))
-      } catch (error) {
-        messengerError = error
-        console.warn('Messenger cleaning list skipped:', error)
-      }
-      try {
-        await sendMessengerMessage(buildRoomReadyMessage(cleaningTaskRoomLabel(completedTask)))
-      } catch (error) {
-        messengerError = error
-        console.warn('Messenger room ready message skipped:', error)
-      }
-    }
-
     set((state) => ({
-      toasts: messengerError
-        ? addToast(
-            state.toasts,
-            'Messenger message failed',
-            `Cleaning was completed, but the Messenger group was not notified: ${
-              messengerError instanceof Error ? messengerError.message : 'unknown error'
-            }`,
-            'warning',
-          )
-        : addToast(state.toasts, 'Cleaning task completed', 'The completion was recorded in the cleaning history.'),
+      toasts: addToast(state.toasts, 'Cleaning task completed', 'The completion was recorded in the cleaning history.'),
     }))
   },
 

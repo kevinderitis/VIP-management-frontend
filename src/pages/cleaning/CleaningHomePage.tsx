@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Hand, Loader2, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
+import { CheckCircle2, Hand, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
 import { getMessengerChatUrl } from '../../lib/messenger'
 import { useAppStore, useCleanerUsers, useSessionUser } from '../../store/app-store'
 import { Task } from '../../types/models'
@@ -37,7 +37,6 @@ export const CleaningHomePage = () => {
   })
   const [busyId, setBusyId] = useState<string | null>(null)
   const [justDone, setJustDone] = useState<Array<{ id: string; name: string }>>([])
-  const [sendingMsg, setSendingMsg] = useState<{ id: string; name: string } | null>(null)
   const chatUrl = getMessengerChatUrl()
 
   useEffect(() => {
@@ -111,20 +110,17 @@ export const CleaningHomePage = () => {
   const handleDone = async (task: Task) => {
     const name = roomName(task)
     setBusyId(task.id)
-    // The store completes the task and then posts the updated cleaning list
-    // plus the "room is ready" message. Keep the loader up until both finish.
-    setSendingMsg({ id: task.id, name })
+    // Completion is recorded here; the admin device with the Messenger bot
+    // detects the change and posts the updated list plus the ready message.
     try {
       await completeCleaningTask(task.id)
     } catch (error) {
       console.warn('Could not complete cleaning task:', error)
-      setSendingMsg(null)
       setBusyId(null)
       return
     }
     setBusyId(null)
     setInProgress((current) => current.filter((taskId) => taskId !== task.id))
-    setSendingMsg(null)
     setJustDone((current) => [{ id: task.id, name }, ...current].slice(0, 5))
   }
 
@@ -138,13 +134,6 @@ export const CleaningHomePage = () => {
           </p>
         ) : null}
       </div>
-
-      {sendingMsg ? (
-        <div className="flex items-center justify-center gap-3 rounded-[28px] border-2 border-teal bg-teal/10 p-5 shadow-soft">
-          <Loader2 size={24} className="animate-spin text-teal" />
-          <p className="text-xl font-semibold text-ink">Sending update to Messenger…</p>
-        </div>
-      ) : null}
 
       {justDone.map((done) => (
         <div key={done.id} className="rounded-[28px] border-2 border-emerald-500 bg-emerald-50 p-5 shadow-soft">
