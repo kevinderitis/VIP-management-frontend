@@ -18,11 +18,14 @@ import { addToast, useAppStore, useSessionUser } from '../store/app-store'
 import { Task } from '../types/models'
 
 type CleaningTaskSnapshot = {
+  id: string
   status: Task['status']
   roomCode?: string
   placeName?: string
   label: string
 }
+
+const SEND_DEBOUNCE_MS = 700
 
 const MESSENGER_CONFIGURED = isMessengerConfigured()
 
@@ -81,10 +84,11 @@ const sendBoardUpdate = async (
 }
 
 // The Messenger bot runs on the admin PC. This hook turns that browser into
-// the sender: it watches the state the admin already receives, detects room /
-// place list changes and cleaner DONE transitions, and only sends when the bot
-// is reachable from this device. Phones receive the same state updates but
-// fail the reachability probe, so they never try to send.
+// the sender: it watches the state the admin already receives, detects any
+// update to a room or custom place that is on the needs-cleaning list (status,
+// cleaner, task or bed state), and sends the full list again. Cleaner DONE
+// transitions additionally send the ready confirmation. Phones receive the
+// same state updates but fail the reachability probe, so they never send.
 export const useCleaningMessengerBridge = () => {
   const user = useSessionUser()
   const userId = user?.id
@@ -163,6 +167,7 @@ export const useCleaningMessengerBridge = () => {
     for (const task of tasks) {
       if (task.audience !== 'cleaning') continue
       snapshot.set(task.id, {
+        id: task.id,
         status: task.status,
         roomCode: task.cleaningRoomCode,
         placeName:
@@ -179,19 +184,43 @@ export const useCleaningMessengerBridge = () => {
   const previousBoardRef = useRef<{ signature: string } | null>(null)
   const previousTasksRef = useRef<Map<string, CleaningTaskSnapshot> | null>(null)
   const sendQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const pendingSendRef = useRef<{
+    board: CleaningBroadcastBoard
+    completedTasks: CleaningTaskSnapshot[]
+  } | null>(null)
+  const sendTimerRef = useRef<number | undefined>(undefined)
+
+  useEffect(
+    () => () => {
+      if (sendTimerRef.current) window.clearTimeout(sendTimerRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!isReady || userRole !== 'admin') {
       previousUserRef.current = null
       previousBoardRef.current = null
       previousTasksRef.current = null
+      pendingSendRef.current = null
+      if (sendTimerRef.current) {
+        window.clearTimeout(sendTimerRef.current)
+        sendTimerRef.current = undefined
+      }
       return
     }
 
     // Keep the last known snapshot while the bot is temporarily unreachable.
     // When it comes back, the next effect run compares against it and sends
     // the current list, so changes made during the outage are not lost.
-    if (!bridgeEnabled) return
+    if (!bridgeEnabled) {
+      pendingSendRef.current = null
+      if (sendTimerRef.current) {
+        window.clearTimeout(sendTimerRef.current)
+        sendTimerRef.current = undefined
+      }
+      return
+    }
 
     if (previousUserRef.current !== userId) {
       previousUserRef.current = userId ?? null
@@ -217,10 +246,21 @@ export const useCleaningMessengerBridge = () => {
     const listChanged = previousBoard.signature !== boardSignature
     if (!listChanged && completedTasks.length === 0) return
 
-    const completedRoomCodes = completedTasks
+    // A single admin action can produce several state updates (optimistic
+    // update, server refresh, socket refresh). Debounce briefly and always
+    // send the latest board so the group gets one message per change.
+    const mergedCompleted = [
+      ...(pendingSendRef.current?.completedTasks ?? []),
+      ...completedTasks,
+    ]
+    const uniqueCompleted = [
+      ...new Map(mergedCompleted.map((task) => [task.id, task])).values(),
+    ]
+
+    const completedRoomCodes = uniqueCompleted
       .map((task) => task.roomCode)
       .filter((code): code is string => Boolean(code))
-    const completedPlaceNames = completedTasks
+    const completedPlaceNames = uniqueCompleted
       .map((task) => task.placeName)
       .filter((name): name is string => Boolean(name))
 
@@ -229,11 +269,21 @@ export const useCleaningMessengerBridge = () => {
       places: board.places.filter((place) => !completedPlaceNames.includes(place.name)),
     }
 
-    // The queue keeps the list ahead of the ready confirmations, even when
-    // two refreshes arrive close together.
-    sendQueueRef.current = sendQueueRef.current
-      .then(() => sendBoardUpdate(nextBoard, completedTasks))
-      .catch((error) => console.warn('Cleaning Messenger bridge failed:', error))
+    pendingSendRef.current = { board: nextBoard, completedTasks: uniqueCompleted }
+
+    if (sendTimerRef.current) window.clearTimeout(sendTimerRef.current)
+    sendTimerRef.current = window.setTimeout(() => {
+      const payload = pendingSendRef.current
+      pendingSendRef.current = null
+      sendTimerRef.current = undefined
+      if (!payload) return
+
+      // The queue keeps the list ahead of the ready confirmations, even when
+      // two changes arrive close together.
+      sendQueueRef.current = sendQueueRef.current
+        .then(() => sendBoardUpdate(payload.board, payload.completedTasks))
+        .catch((error) => console.warn('Cleaning Messenger bridge failed:', error))
+    }, SEND_DEBOUNCE_MS)
   }, [
     board,
     boardSignature,

@@ -1,14 +1,29 @@
 import { CleaningArea, CleaningPlaceStatus, CleaningRoom, Task } from '../types/models'
 
+// Beyond the room identity, the broadcast board tracks the cleaning-relevant
+// details (service status, cleaner and task state). They are not printed in
+// the message, but they make the board signature change whenever a room or
+// place that is on the list gets updated, so the full list is sent again.
 export interface BroadcastRoomInfo {
   code: string
   section: string
   roomType: CleaningRoom['roomType']
   label: string
+  bedCount: number
+  statusLabel?: string
+  assigneeId?: string
+  taskStatus?: Task['status']
+  bedStates: string
+  trashRequested?: boolean
 }
 
 export interface BroadcastPlaceInfo {
   name: string
+  statusLabel?: string
+  assigneeId?: string
+  taskStatus?: Task['status']
+  bedStates: string
+  trashRequested?: boolean
 }
 
 export interface CleaningBroadcastBoard {
@@ -31,6 +46,15 @@ export const formatBroadcastDate = (date = new Date()) =>
     minute: '2-digit',
   })
 
+// Compact, order-stable description of the bed states. It feeds the board
+// signature so a bed update on a room that is still on the list also triggers
+// a fresh broadcast.
+const bedStateSignature = (beds: CleaningPlaceStatus['beds'] = []) =>
+  [...beds]
+    .sort((a, b) => a.bedNumber - b.bedNumber)
+    .map((bed) => `${bed.bedNumber}:${normalizeCleaningLabel(bed.label)}`)
+    .join('|')
+
 // Mirrors the room board: a room belongs to the cleaning list when its room
 // service status is "Needs cleaning" or it still has an unstarted cleaning
 // task. Rooms with a started task are "In progress" and stay off the list.
@@ -41,32 +65,40 @@ export function collectRoomsNeedingCleaning(
   options?: { excludeRoomCodes?: string[] },
 ): BroadcastRoomInfo[] {
   const excluded = new Set(options?.excludeRoomCodes ?? [])
+  const result: BroadcastRoomInfo[] = []
 
-  return rooms
-    .filter((room) => {
-      if (!room.isActive || excluded.has(room.code)) return false
+  for (const room of rooms) {
+    if (!room.isActive || excluded.has(room.code)) continue
 
-      const status = statuses.find(
-        (entry) => entry.placeType === 'room' && entry.roomCode === room.code,
-      )
-      const activeTask = tasks.find(
-        (task) =>
-          task.audience === 'cleaning' &&
-          task.cleaningLocationType === 'room' &&
-          task.cleaningRoomCode === room.code &&
-          ACTIVE_CLEANING_TASK_STATUSES.includes(task.status),
-      )
+    const status = statuses.find(
+      (entry) => entry.placeType === 'room' && entry.roomCode === room.code,
+    )
+    const activeTask = tasks.find(
+      (task) =>
+        task.audience === 'cleaning' &&
+        task.cleaningLocationType === 'room' &&
+        task.cleaningRoomCode === room.code &&
+        ACTIVE_CLEANING_TASK_STATUSES.includes(task.status),
+    )
 
-      if (activeTask?.startedAt) return false
+    if (activeTask?.startedAt) continue
+    if (!isNeedsCleaningLabel(status?.roomServiceLabel) && !activeTask) continue
 
-      return isNeedsCleaningLabel(status?.roomServiceLabel) || Boolean(activeTask)
-    })
-    .map((room) => ({
+    result.push({
       code: room.code,
       section: room.section,
       roomType: room.roomType,
       label: room.label,
-    }))
+      bedCount: room.bedCount,
+      statusLabel: status?.roomServiceLabel ?? status?.label,
+      assigneeId: activeTask?.assignedTo,
+      taskStatus: activeTask?.status,
+      bedStates: bedStateSignature(status?.beds),
+      trashRequested: status?.trashRequested,
+    })
+  }
+
+  return result
 }
 
 // Same rule as the custom-place cards: the saved custom status wins. When a
@@ -79,39 +111,71 @@ export function collectPlacesNeedingCleaning(
   options?: { excludePlaceNames?: string[] },
 ): BroadcastPlaceInfo[] {
   const excluded = new Set(options?.excludePlaceNames ?? [])
+  const result: BroadcastPlaceInfo[] = []
 
-  return areas
-    .filter((area) => {
-      if (!area.isActive || excluded.has(area.name)) return false
+  for (const area of areas) {
+    if (!area.isActive || excluded.has(area.name)) continue
 
-      const status = statuses.find(
-        (entry) =>
-          entry.placeType === 'custom' &&
-          (entry.cleaningAreaId === area.id || entry.placeLabel === area.name),
-      )
-      const activeTask = tasks.find(
-        (task) =>
-          task.audience === 'cleaning' &&
-          task.cleaningLocationType === 'custom' &&
-          task.cleaningLocationLabel === area.name &&
-          ACTIVE_CLEANING_TASK_STATUSES.includes(task.status),
-      )
+    const status = statuses.find(
+      (entry) =>
+        entry.placeType === 'custom' &&
+        (entry.cleaningAreaId === area.id || entry.placeLabel === area.name),
+    )
+    const activeTask = tasks.find(
+      (task) =>
+        task.audience === 'cleaning' &&
+        task.cleaningLocationType === 'custom' &&
+        task.cleaningLocationLabel === area.name &&
+        ACTIVE_CLEANING_TASK_STATUSES.includes(task.status),
+    )
 
-      if (activeTask?.startedAt) return false
-      if (status) return isNeedsCleaningLabel(status.label)
+    if (activeTask?.startedAt) continue
+    if (status ? !isNeedsCleaningLabel(status.label) : !activeTask) continue
 
-      return Boolean(activeTask)
+    result.push({
+      name: area.name,
+      statusLabel: status?.label,
+      assigneeId: activeTask?.assignedTo,
+      taskStatus: activeTask?.status,
+      bedStates: bedStateSignature(status?.beds),
+      trashRequested: status?.trashRequested,
     })
-    .map((area) => ({ name: area.name }))
+  }
+
+  return result
 }
 
+// The signature covers every detail the broadcast reacts to. When a room or
+// place that is still on the needs-cleaning list changes (service status,
+// assigned cleaner, task state, room metadata), the signature changes and the
+// full list is sent again. Unrelated state refreshes keep the same signature.
 export const cleaningBoardSignature = (board: CleaningBroadcastBoard) =>
-  [
-    ...board.rooms.map((room) => `room:${room.code}`),
-    ...board.places.map((place) => `place:${place.name}`),
-  ]
-    .sort()
-    .join('|')
+  JSON.stringify({
+    rooms: [...board.rooms]
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map((room) => [
+        room.code,
+        room.section,
+        room.roomType,
+        room.label,
+        room.bedCount,
+        room.statusLabel ?? '',
+        room.assigneeId ?? '',
+        room.taskStatus ?? '',
+        room.bedStates,
+        room.trashRequested ? '1' : '0',
+      ]),
+    places: [...board.places]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((place) => [
+        place.name,
+        place.statusLabel ?? '',
+        place.assigneeId ?? '',
+        place.taskStatus ?? '',
+        place.bedStates,
+        place.trashRequested ? '1' : '0',
+      ]),
+  })
 
 export function buildCleaningBroadcastMessage(
   board: CleaningBroadcastBoard,
