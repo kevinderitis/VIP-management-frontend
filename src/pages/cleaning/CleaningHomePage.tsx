@@ -5,6 +5,7 @@ import { getMessengerChatUrl } from '../../lib/messenger'
 import { useCleanerI18n } from '../../lib/cleaner-i18n'
 import { useAppStore, useCleanerUsers, useSessionUser } from '../../store/app-store'
 import { Task } from '../../types/models'
+import { toLocalDateKey } from '../../utils/format'
 
 const taskName = (task: Task, roomLabel = 'Room') =>
   task.cleaningRoomCode ? `${roomLabel} ${task.cleaningRoomCode}` : (task.cleaningLocationLabel ?? task.title)
@@ -94,7 +95,11 @@ export const CleaningHomePage = () => {
   const doneToday = useMemo(
     () =>
       tasks.filter(
-        (task) => task.audience === 'cleaning' && task.assignedTo === user?.id && task.status === 'completed',
+        (task) =>
+          task.audience === 'cleaning' &&
+          task.assignedTo === user?.id &&
+          task.status === 'completed' &&
+          toLocalDateKey(task.endsAt ?? task.publishedAt) === toLocalDateKey(),
       ).length,
     [tasks, user?.id],
   )
