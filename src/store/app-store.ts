@@ -127,7 +127,7 @@ type AppState = ServerState & {
   takeOverCleaningTask: (taskId: string) => Promise<void>
   startCleaningTask: (taskId: string) => Promise<void>
   releaseCleaningTask: (taskId: string) => Promise<void>
-  completeCleaningTask: (taskId: string) => Promise<void>
+  completeCleaningTask: (taskId: string, checklist?: { acOk?: boolean; lightOk?: boolean }) => Promise<void>
   createReward: (input: RewardDraftInput) => Promise<void>
   updateReward: (rewardId: string, input: RewardDraftInput) => Promise<void>
   toggleReward: (rewardId: string) => Promise<void>
@@ -1217,10 +1217,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
   },
 
-  completeCleaningTask: async (taskId) => {
+  completeCleaningTask: async (taskId, checklist) => {
     await apiRequest(`/cleaning-tasks/${taskId}/complete`, {
       method: 'POST',
       token: get().accessToken,
+      body: {
+        acOk: checklist?.acOk ?? undefined,
+        lightOk: checklist?.lightOk ?? undefined,
+      },
     })
     await get().refreshState()
     set((state) => ({

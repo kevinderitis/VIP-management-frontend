@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Hand, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
+import { AirVent, CheckCircle2, Hand, Lightbulb, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
+import { Modal } from '../../components/common/Modal'
 import { getMessengerChatUrl } from '../../lib/messenger'
+import { useCleanerI18n } from '../../lib/cleaner-i18n'
 import { useAppStore, useCleanerUsers, useSessionUser } from '../../store/app-store'
 import { Task } from '../../types/models'
 
-const roomName = (task: Task) =>
-  task.cleaningRoomCode ? `Room ${task.cleaningRoomCode}` : (task.cleaningLocationLabel ?? task.title)
+const taskName = (task: Task, roomLabel = 'Room') =>
+  task.cleaningRoomCode ? `${roomLabel} ${task.cleaningRoomCode}` : (task.cleaningLocationLabel ?? task.title)
 
 const placeDetail = (task: Task) => {
   const parts: string[] = []
@@ -37,7 +39,12 @@ export const CleaningHomePage = () => {
   })
   const [busyId, setBusyId] = useState<string | null>(null)
   const [justDone, setJustDone] = useState<Array<{ id: string; name: string }>>([])
+  const [checklistTask, setChecklistTask] = useState<Task | null>(null)
+  const [acOk, setAcOk] = useState(false)
+  const [lightOk, setLightOk] = useState(false)
   const chatUrl = getMessengerChatUrl()
+  const { t } = useCleanerI18n()
+  const roomName = (task: Task) => taskName(task, t('room'))
 
   useEffect(() => {
     localStorage.setItem(storageKey(user?.id), JSON.stringify(inProgress))
@@ -107,30 +114,54 @@ export const CleaningHomePage = () => {
     }
   }
 
-  const handleDone = async (task: Task) => {
+  const handleDone = async (task: Task, checklist?: { acOk?: boolean; lightOk?: boolean }) => {
     const name = roomName(task)
     setBusyId(task.id)
     // Completion is recorded here; the admin device with the Messenger bot
     // detects the change and posts the updated list plus the ready message.
     try {
-      await completeCleaningTask(task.id)
+      await completeCleaningTask(task.id, checklist)
     } catch (error) {
       console.warn('Could not complete cleaning task:', error)
       setBusyId(null)
-      return
+      return false
     }
     setBusyId(null)
     setInProgress((current) => current.filter((taskId) => taskId !== task.id))
     setJustDone((current) => [{ id: task.id, name }, ...current].slice(0, 5))
+    return true
   }
+
+  // Rooms ask for the AC/Light check before closing. Custom places keep the
+  // direct DONE action.
+  const requestDone = (task: Task) => {
+    if (task.cleaningLocationType !== 'room') {
+      void handleDone(task)
+      return
+    }
+    setAcOk(false)
+    setLightOk(false)
+    setChecklistTask(task)
+  }
+
+  const confirmChecklist = async () => {
+    if (!checklistTask) return
+    const done = await handleDone(checklistTask, {
+      acOk: acOk || undefined,
+      lightOk: lightOk || undefined,
+    })
+    if (done) setChecklistTask(null)
+  }
+
+  const checklistBusy = Boolean(checklistTask && busyId === checklistTask.id)
 
   return (
     <div className="grid gap-5">
       <div className="flex items-end justify-between gap-3">
-        <h2 className="font-display text-3xl font-semibold text-ink">🧹 My list</h2>
+        <h2 className="font-display text-3xl font-semibold text-ink">{t('myList')}</h2>
         {doneToday > 0 ? (
           <p className="inline-flex shrink-0 items-center gap-1.5 text-base font-semibold text-emerald-700">
-            <CheckCircle2 size={18} /> Done: {doneToday}
+            <CheckCircle2 size={18} /> {t('doneCount', { count: doneToday })}
           </p>
         ) : null}
       </div>
@@ -138,7 +169,7 @@ export const CleaningHomePage = () => {
       {justDone.map((done) => (
         <div key={done.id} className="rounded-[28px] border-2 border-emerald-500 bg-emerald-50 p-5 shadow-soft">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-display text-2xl font-semibold text-emerald-900">{done.name} done ✓</p>
+            <p className="font-display text-2xl font-semibold text-emerald-900">{t('roomDone', { name: done.name })}</p>
             <button
               type="button"
               aria-label="Dismiss"
@@ -155,10 +186,10 @@ export const CleaningHomePage = () => {
               rel="noreferrer"
               className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[#0084ff] text-xl font-bold text-white active:scale-[0.99]"
             >
-              <MessageCircle size={22} /> OPEN MESSENGER CHAT
+              <MessageCircle size={22} /> {t('openMessenger')}
             </a>
           ) : (
-            <p className="mt-3 text-base text-emerald-800">Chat link not set yet.</p>
+            <p className="mt-3 text-base text-emerald-800">{t('chatLinkMissing')}</p>
           )}
         </div>
       ))}
@@ -185,7 +216,7 @@ export const CleaningHomePage = () => {
                   <span
                     className={`shrink-0 rounded-full px-4 py-2 text-base font-bold ${started ? 'bg-teal/15 text-teal' : 'bg-amber-100 text-amber-800'}`}
                   >
-                    {started ? 'STARTED' : 'TO DO'}
+                    {started ? t('started') : t('toDo')}
                   </span>
                 </div>
 
@@ -196,20 +227,20 @@ export const CleaningHomePage = () => {
                     onClick={() => void handleStart(task)}
                     className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-xl font-bold text-white active:scale-[0.99]"
                   >
-                    <Play size={22} /> START
+                    <Play size={22} /> {t('start')}
                   </button>
                 ) : (
                   <div className="mt-4 grid gap-2">
                     <div className="rounded-2xl bg-teal/10 p-4 text-lg text-ink">
-                      Cleaning now… tap the green button when done.
+                      {t('cleaningNow')}
                     </div>
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => void handleDone(task)}
+                      onClick={() => requestDone(task)}
                       className="flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-xl font-bold text-white active:scale-[0.99]"
                     >
-                      <CheckCircle2 size={22} /> DONE
+                      <CheckCircle2 size={22} /> {t('done')}
                     </button>
                     <button
                       type="button"
@@ -217,7 +248,7 @@ export const CleaningHomePage = () => {
                       onClick={() => run(task.id, () => releaseCleaningTask(task.id))}
                       className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600"
                     >
-                      <RotateCcw size={18} /> Give back
+                      <RotateCcw size={18} /> {t('giveBack')}
                     </button>
                   </div>
                 )}
@@ -228,8 +259,8 @@ export const CleaningHomePage = () => {
       ) : (
         <div className="grid gap-4">
           <div className="rounded-[28px] bg-white p-5 text-center shadow-soft">
-            <p className="text-xl font-semibold text-ink">Your list is empty</p>
-            <p className="mt-1 text-lg text-slate-500">Take a task below to add it to your list.</p>
+            <p className="text-xl font-semibold text-ink">{t('listEmpty')}</p>
+            <p className="mt-1 text-lg text-slate-500">{t('listEmptyHint')}</p>
           </div>
 
           {teamTasks.map((task) => {
@@ -244,7 +275,7 @@ export const CleaningHomePage = () => {
                       <MapPin size={18} /> {placeDetail(task)}
                     </span>
                   ) : null}
-                  {holder ? <span className="text-slate-400">· with {holder}</span> : null}
+                  {holder ? <span className="text-slate-400">{t('withCleaner', { name: holder })}</span> : null}
                 </p>
                 <button
                   type="button"
@@ -252,7 +283,7 @@ export const CleaningHomePage = () => {
                   onClick={() => run(task.id, () => takeOverCleaningTask(task.id))}
                   className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 text-xl font-bold text-white active:scale-[0.99]"
                 >
-                  <Hand size={22} /> TAKE
+                  <Hand size={22} /> {t('take')}
                 </button>
               </div>
             )
@@ -274,7 +305,7 @@ export const CleaningHomePage = () => {
                   onClick={() => run(task.id, () => takeCleaningTask(task.id))}
                   className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 text-xl font-bold text-white active:scale-[0.99]"
                 >
-                  <Hand size={22} /> TAKE
+                  <Hand size={22} /> {t('take')}
                 </button>
               </div>
             )
@@ -282,11 +313,76 @@ export const CleaningHomePage = () => {
 
           {teamTasks.length === 0 && availableTasks.length === 0 ? (
             <div className="rounded-[28px] bg-white p-6 text-center text-lg text-slate-500">
-              Nothing to take right now. Good job 👏
+              {t('nothingToTake')}
             </div>
           ) : null}
         </div>
       )}
+
+      {checklistTask ? (
+        <Modal
+          open
+          onClose={() => {
+            if (!checklistBusy) setChecklistTask(null)
+          }}
+          title={`${roomName(checklistTask)} — ${t('finalCheck')}`}
+          description={t('finalCheckHint')}
+          panelClassName="max-w-md"
+        >
+          <div className="grid gap-3">
+            <label
+              className={`flex min-h-[64px] cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 text-xl font-semibold transition ${
+                acOk
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                  : 'border-slate-200 bg-white text-ink'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={acOk}
+                onChange={(event) => setAcOk(event.target.checked)}
+                className="h-6 w-6 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <AirVent size={24} className="text-sky-600" />
+              {t('acOk')}
+            </label>
+
+            <label
+              className={`flex min-h-[64px] cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 text-xl font-semibold transition ${
+                lightOk
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                  : 'border-slate-200 bg-white text-ink'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={lightOk}
+                onChange={(event) => setLightOk(event.target.checked)}
+                className="h-6 w-6 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <Lightbulb size={24} className="text-amber-500" />
+              {t('lightOk')}
+            </label>
+
+            <button
+              type="button"
+              disabled={checklistBusy}
+              onClick={() => void confirmChecklist()}
+              className="mt-2 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-xl font-bold text-white active:scale-[0.99] disabled:opacity-60"
+            >
+              <CheckCircle2 size={22} /> {checklistBusy ? t('sending') : t('done')}
+            </button>
+            <button
+              type="button"
+              disabled={checklistBusy}
+              onClick={() => setChecklistTask(null)}
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600 disabled:opacity-60"
+            >
+              {t('cancel')}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }

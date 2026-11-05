@@ -184,8 +184,9 @@ export const cleaningBoardSignature = (board: CleaningBroadcastBoard) =>
   })
 
 const assignmentLabel = (place: { assigneeName?: string; assigneeId?: string }) => {
-  if (place.assigneeName) return `Assigned to ${place.assigneeName}`
-  if (place.assigneeId) return 'Assigned to a cleaner'
+  // Only the cleaner name keeps the Messenger line short.
+  if (place.assigneeName) return place.assigneeName
+  if (place.assigneeId) return 'Cleaner assigned'
   return ''
 }
 
@@ -240,4 +241,12 @@ export function buildCleaningBroadcastMessage(
   return lines.join('\n')
 }
 
-export const buildRoomReadyMessage = (roomLabel: string) => `✅ ${roomLabel} is ready`
+export const buildRoomReadyMessage = (
+  roomLabel: string,
+  checklist?: { acOk?: boolean; lightOk?: boolean },
+) => {
+  const lines = [`✅ ${roomLabel} is ready`]
+  if (checklist?.acOk) lines.push('AC ok')
+  if (checklist?.lightOk) lines.push('Light ok')
+  return lines.join('\n')
+}

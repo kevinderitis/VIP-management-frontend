@@ -23,7 +23,11 @@ type CleaningTaskSnapshot = {
   roomCode?: string
   placeName?: string
   label: string
+  acOk?: boolean
+  lightOk?: boolean
 }
+
+type RoomChecklist = { acOk?: boolean; lightOk?: boolean }
 
 const SEND_DEBOUNCE_MS = 700
 
@@ -76,7 +80,9 @@ const sendBoardUpdate = async (
   let readySent = 0
   for (const task of completedTasks) {
     try {
-      await sendMessengerMessage(buildRoomReadyMessage(task.label))
+      await sendMessengerMessage(
+        buildRoomReadyMessage(task.label, { acOk: task.acOk, lightOk: task.lightOk }),
+      )
       readySent += 1
     } catch (error) {
       readyFailed = true
@@ -148,6 +154,8 @@ export const useCleaningMessengerBridge = () => {
     }
   }, [shouldProbe])
 
+  const readyChecklistRef = useRef<Map<string, RoomChecklist>>(new Map())
+
   useEffect(() => {
     if (!bridgeEnabled || !accessToken) return
 
@@ -159,9 +167,20 @@ export const useCleaningMessengerBridge = () => {
       auth: { token: accessToken },
     })
 
-    socket.on('tasks:updated', () => {
-      void refreshState()
-    })
+    socket.on(
+      'tasks:updated',
+      (event?: { type?: string; taskId?: string; acOk?: boolean; lightOk?: boolean }) => {
+        // The AC/Light checklist travels with the completion event only; it is
+        // never stored. Keep it in memory so the ready message can include it.
+        if (event?.type === 'completed' && event.taskId && (event.acOk || event.lightOk)) {
+          readyChecklistRef.current.set(event.taskId, {
+            acOk: Boolean(event.acOk),
+            lightOk: Boolean(event.lightOk),
+          })
+        }
+        void refreshState()
+      },
+    )
 
     return () => {
       socket.disconnect()
@@ -228,6 +247,7 @@ export const useCleaningMessengerBridge = () => {
       previousBoardRef.current = null
       previousTasksRef.current = null
       pendingSendRef.current = null
+      readyChecklistRef.current.clear()
       if (sendTimerRef.current) {
         window.clearTimeout(sendTimerRef.current)
         sendTimerRef.current = undefined
@@ -303,10 +323,19 @@ export const useCleaningMessengerBridge = () => {
       sendTimerRef.current = undefined
       if (!payload) return
 
+      // Resolve the AC/Light checklist at send time so a socket event that
+      // arrives during the debounce window is still included.
+      const completedTasks = payload.completedTasks.map((task) => {
+        const checklist = readyChecklistRef.current.get(task.id)
+        if (!checklist) return task
+        readyChecklistRef.current.delete(task.id)
+        return { ...task, ...checklist }
+      })
+
       // The queue keeps the list ahead of the ready confirmations, even when
       // two changes arrive close together.
       sendQueueRef.current = sendQueueRef.current
-        .then(() => sendBoardUpdate(payload.board, payload.completedTasks))
+        .then(() => sendBoardUpdate(payload.board, completedTasks))
         .catch((error) => console.warn('Cleaning Messenger bridge failed:', error))
     }, SEND_DEBOUNCE_MS)
   }, [
