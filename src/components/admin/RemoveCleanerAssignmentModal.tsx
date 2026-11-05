@@ -1,4 +1,5 @@
-import { BedDouble, Sparkles, UserMinus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BedDouble, Check, Sparkles, UserMinus } from 'lucide-react'
 import { Task } from '../../types/models'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
@@ -21,9 +22,30 @@ export const RemoveCleanerAssignmentModal = ({
   cleanerName: string
   onConfirm: (state: RemovedRoomState) => Promise<void> | void
 }) => {
+  const [selectedState, setSelectedState] = useState<RemovedRoomState | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setSelectedState(null)
+    setSaving(false)
+  }, [open, task?.id])
+
   if (!task) return null
 
   const isRoom = Boolean(task.cleaningRoomCode)
+  const canConfirm = Boolean(selectedState) && !saving
+
+  const handleConfirm = async () => {
+    if (!selectedState || !canConfirm) return
+    setSaving(true)
+    try {
+      await onConfirm(selectedState)
+    } finally {
+      setSaving(false)
+      onClose()
+    }
+  }
 
   return (
     <Modal
@@ -40,39 +62,60 @@ export const RemoveCleanerAssignmentModal = ({
         <div className="grid gap-3">
           <button
             type="button"
-            onClick={() => onConfirm('Occupied')}
-            className="flex items-center gap-4 rounded-[24px] border-2 border-blue-200 bg-blue-50 px-5 py-4 text-left transition hover:border-blue-400"
+            onClick={() => setSelectedState('Occupied')}
+            aria-pressed={selectedState === 'Occupied'}
+            className={`flex items-center gap-4 rounded-[24px] border-2 px-5 py-4 text-left transition ${
+              selectedState === 'Occupied'
+                ? 'border-blue-500 bg-blue-50 shadow-soft ring-2 ring-blue-200'
+                : 'border-blue-200 bg-blue-50/60 hover:border-blue-400'
+            }`}
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white">
               <BedDouble size={22} />
             </span>
-            <span>
+            <span className="min-w-0 flex-1">
               <span className="block font-semibold text-ink">Room is occupied</span>
               <span className="mt-0.5 block text-sm text-slate-600">
                 The room board turns blue and the cleaning task is closed.
               </span>
             </span>
+            {selectedState === 'Occupied' ? <Check size={20} className="shrink-0 text-blue-600" /> : null}
           </button>
 
           <button
             type="button"
-            onClick={() => onConfirm('Clean')}
-            className="flex items-center gap-4 rounded-[24px] border-2 border-emerald-200 bg-emerald-50 px-5 py-4 text-left transition hover:border-emerald-400"
+            onClick={() => setSelectedState('Clean')}
+            aria-pressed={selectedState === 'Clean'}
+            className={`flex items-center gap-4 rounded-[24px] border-2 px-5 py-4 text-left transition ${
+              selectedState === 'Clean'
+                ? 'border-emerald-500 bg-emerald-50 shadow-soft ring-2 ring-emerald-200'
+                : 'border-emerald-200 bg-emerald-50/60 hover:border-emerald-400'
+            }`}
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white">
               <Sparkles size={22} />
             </span>
-            <span>
+            <span className="min-w-0 flex-1">
               <span className="block font-semibold text-ink">Room is clean</span>
               <span className="mt-0.5 block text-sm text-slate-600">
                 The room board turns green and the cleaning task is closed.
               </span>
             </span>
+            {selectedState === 'Clean' ? <Check size={20} className="shrink-0 text-emerald-600" /> : null}
           </button>
 
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!canConfirm}
+              onClick={() => void handleConfirm()}
+            >
+              {saving ? 'Removing…' : 'Confirm'}
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-3">
