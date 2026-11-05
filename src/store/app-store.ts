@@ -125,6 +125,7 @@ type AppState = ServerState & {
   unassignCleaningTask: (taskId: string) => Promise<void>
   takeCleaningTask: (taskId: string) => Promise<void>
   takeOverCleaningTask: (taskId: string) => Promise<void>
+  delegateCleaningTask: (taskId: string, cleanerId: string) => Promise<void>
   startCleaningTask: (taskId: string) => Promise<void>
   releaseCleaningTask: (taskId: string) => Promise<void>
   completeCleaningTask: (taskId: string, checklist?: { acOk?: boolean; lightOk?: boolean }) => Promise<void>
@@ -1196,6 +1197,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       toasts: addToast(state.toasts, 'Task added to your list', 'It is now assigned to you.'),
     }))
+  },
+
+  delegateCleaningTask: async (taskId, cleanerId) => {
+    // Optimistic: move the task to the chosen cleaner right away.
+    const previousTasks = get().tasks
+    beginLocalMutation()
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, assignedTo: cleanerId, startedAt: undefined }
+          : task,
+      ),
+    }))
+    try {
+      await apiRequest(`/cleaning-tasks/${taskId}/delegate`, {
+        method: 'POST',
+        token: get().accessToken,
+        body: { cleanerId },
+      })
+      endLocalMutation()
+      await get().refreshState()
+      set((state) => ({
+        toasts: addToast(state.toasts, 'Task delegated', 'The task moved to the selected cleaner.'),
+      }))
+    } catch (error) {
+      endLocalMutation()
+      set((state) => ({
+        tasks: previousTasks,
+        toasts: addToast(
+          state.toasts,
+          'Could not delegate the task',
+          error instanceof Error ? error.message : 'The cleaning task delegation failed.',
+          'warning',
+        ),
+      }))
+      throw error
+    }
   },
 
   startCleaningTask: async (taskId) => {

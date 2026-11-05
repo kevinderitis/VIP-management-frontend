@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AirVent, CheckCircle2, Hand, Lightbulb, MapPin, MessageCircle, Play, RotateCcw, X } from 'lucide-react'
+import { AirVent, CheckCircle2, Hand, Lightbulb, MapPin, MessageCircle, Play, RotateCcw, Send, X } from 'lucide-react'
 import { Modal } from '../../components/common/Modal'
 import { getMessengerChatUrl } from '../../lib/messenger'
 import { useCleanerI18n } from '../../lib/cleaner-i18n'
@@ -28,6 +28,7 @@ export const CleaningHomePage = () => {
   const takeOverCleaningTask = useAppStore((state) => state.takeOverCleaningTask)
   const startCleaningTask = useAppStore((state) => state.startCleaningTask)
   const releaseCleaningTask = useAppStore((state) => state.releaseCleaningTask)
+  const delegateCleaningTask = useAppStore((state) => state.delegateCleaningTask)
   const completeCleaningTask = useAppStore((state) => state.completeCleaningTask)
 
   const [inProgress, setInProgress] = useState<string[]>(() => {
@@ -42,6 +43,9 @@ export const CleaningHomePage = () => {
   const [checklistTask, setChecklistTask] = useState<Task | null>(null)
   const [acOk, setAcOk] = useState(false)
   const [lightOk, setLightOk] = useState(false)
+  const [delegateTask, setDelegateTask] = useState<Task | null>(null)
+  const [delegateCleanerId, setDelegateCleanerId] = useState('')
+  const [delegateBusy, setDelegateBusy] = useState(false)
   const chatUrl = getMessengerChatUrl()
   const { t } = useCleanerI18n()
   const roomName = (task: Task) => taskName(task, t('room'))
@@ -51,6 +55,11 @@ export const CleaningHomePage = () => {
   }, [inProgress, user?.id])
 
   const cleanerName = useMemo(() => new Map(cleaners.map((cleaner) => [cleaner.id, cleaner.name])), [cleaners])
+
+  const otherCleaners = useMemo(
+    () => cleaners.filter((cleaner) => cleaner.id !== user?.id && cleaner.isActive),
+    [cleaners, user?.id],
+  )
 
   const myTasks = useMemo(
     () =>
@@ -155,6 +164,24 @@ export const CleaningHomePage = () => {
 
   const checklistBusy = Boolean(checklistTask && busyId === checklistTask.id)
 
+  const openDelegate = (task: Task) => {
+    setDelegateTask(task)
+    setDelegateCleanerId(otherCleaners[0]?.id ?? '')
+  }
+
+  const confirmDelegate = async () => {
+    if (!delegateTask || !delegateCleanerId) return
+    setDelegateBusy(true)
+    try {
+      await delegateCleaningTask(delegateTask.id, delegateCleanerId)
+      setDelegateTask(null)
+    } catch (error) {
+      console.warn('Could not delegate cleaning task:', error)
+    } finally {
+      setDelegateBusy(false)
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <div className="flex items-end justify-between gap-3">
@@ -221,14 +248,24 @@ export const CleaningHomePage = () => {
                 </div>
 
                 {!started ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void handleStart(task)}
-                    className="mt-4 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-xl font-bold text-white active:scale-[0.99]"
-                  >
-                    <Play size={22} /> {t('start')}
-                  </button>
+                  <div className="mt-4 grid gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleStart(task)}
+                      className="flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-ink text-xl font-bold text-white active:scale-[0.99]"
+                    >
+                      <Play size={22} /> {t('start')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => openDelegate(task)}
+                      className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600"
+                    >
+                      <Send size={18} /> {t('delegate')}
+                    </button>
+                  </div>
                 ) : (
                   <div className="mt-4 grid gap-2">
                     <div className="rounded-2xl bg-teal/10 p-4 text-lg text-ink">
@@ -241,6 +278,14 @@ export const CleaningHomePage = () => {
                       className="flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-xl font-bold text-white active:scale-[0.99]"
                     >
                       <CheckCircle2 size={22} /> {t('done')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => openDelegate(task)}
+                      className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600"
+                    >
+                      <Send size={18} /> {t('delegate')}
                     </button>
                     <button
                       type="button"
@@ -376,6 +421,61 @@ export const CleaningHomePage = () => {
               type="button"
               disabled={checklistBusy}
               onClick={() => setChecklistTask(null)}
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600 disabled:opacity-60"
+            >
+              {t('cancel')}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {delegateTask ? (
+        <Modal
+          open
+          onClose={() => {
+            if (!delegateBusy) setDelegateTask(null)
+          }}
+          title={`${roomName(delegateTask)} — ${t('delegateTitle')}`}
+          description={t('delegateHint')}
+          panelClassName="max-w-md"
+        >
+          <div className="grid gap-3">
+            {otherCleaners.length === 0 ? (
+              <p className="text-lg text-slate-500">{t('noOtherCleaners')}</p>
+            ) : (
+              otherCleaners.map((cleaner) => (
+                <label
+                  key={cleaner.id}
+                  className={`flex min-h-[64px] cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 text-xl font-semibold transition ${
+                    delegateCleanerId === cleaner.id
+                      ? 'border-teal bg-teal/10 text-teal'
+                      : 'border-slate-200 bg-white text-ink'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="delegate-cleaner"
+                    checked={delegateCleanerId === cleaner.id}
+                    onChange={() => setDelegateCleanerId(cleaner.id)}
+                    className="h-6 w-6 border-slate-300 text-teal focus:ring-teal"
+                  />
+                  {cleaner.name}
+                </label>
+              ))
+            )}
+
+            <button
+              type="button"
+              disabled={delegateBusy || !delegateCleanerId || otherCleaners.length === 0}
+              onClick={() => void confirmDelegate()}
+              className="mt-2 flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-teal text-xl font-bold text-white active:scale-[0.99] disabled:opacity-60"
+            >
+              <Send size={22} /> {delegateBusy ? t('delegateSending') : t('delegateConfirm')}
+            </button>
+            <button
+              type="button"
+              disabled={delegateBusy}
+              onClick={() => setDelegateTask(null)}
               className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 text-lg font-semibold text-slate-600 disabled:opacity-60"
             >
               {t('cancel')}
