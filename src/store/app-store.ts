@@ -182,6 +182,24 @@ const emptyServerState: ServerState = {
   activeStays: [],
 }
 
+// Refresh requests can resolve out of order (12s poll, Socket.IO update and
+// post-mutation refresh all run at once). Only the newest request may apply its
+// response, and any response requested before a local optimistic mutation is
+// discarded: it can still describe the server state that the mutation already
+// replaced, which made a cleared room board repopulate with stale rooms.
+let refreshRequestSequence = 0
+let localMutationRevision = 0
+let mutationsInFlight = 0
+
+const beginLocalMutation = () => {
+  localMutationRevision += 1
+  mutationsInFlight += 1
+}
+
+const endLocalMutation = () => {
+  mutationsInFlight = Math.max(0, mutationsInFlight - 1)
+}
+
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 const toApiEnum = (value?: string) => value?.replaceAll('-', '_').toUpperCase()
 const needsCleaningLabel = (label?: string) =>
@@ -425,13 +443,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     const token = get().accessToken
     if (!token) return
 
+    const requestId = ++refreshRequestSequence
+    const mutationRevisionAtRequest = localMutationRevision
+    const mutationsAtRequest = mutationsInFlight
+
     try {
       const payload = await apiRequest<ServerState>('/app-state', { token })
+      // Drop responses that are no longer the newest request, that started
+      // while an optimistic change was still in flight, or that started before
+      // the latest optimistic change. Applying them would undo the local state
+      // and resend rooms that were just cleared from the board.
+      if (requestId !== refreshRequestSequence) return
+      if (mutationsAtRequest > 0 || mutationsInFlight > 0) return
+      if (mutationRevisionAtRequest !== localMutationRevision) return
       set((state) => ({
         ...state,
         ...normalizeServerState(payload),
       }))
     } catch (error) {
+      if (requestId !== refreshRequestSequence) return
+      if (mutationsAtRequest > 0 || mutationsInFlight > 0) return
       const status = error instanceof ApiError ? error.status : undefined
 
       if (status === 401 || status === 403) {
@@ -842,6 +873,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // then the server response reconciles the canonical state.
     const previousStatuses = get().cleaningPlaceStatuses
     const previousTasks = get().tasks
+    beginLocalMutation()
     set((state) => ({
       cleaningPlaceStatuses: applyOptimisticPlaceStatus(state.cleaningPlaceStatuses, input),
       tasks: applyOptimisticCleaningTasks(state.tasks, {
@@ -858,11 +890,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         token: get().accessToken,
         body: mapCleaningPlaceStatusInput(input),
       })
+      endLocalMutation()
       await get().refreshState()
       set((state) => ({
         toasts: addToast(state.toasts, 'Place status updated', 'The cleaning map reflects the new status color immediately.', 'info'),
       }))
     } catch (error) {
+      endLocalMutation()
       set((state) => ({
         cleaningPlaceStatuses: previousStatuses,
         tasks: previousTasks,
@@ -894,6 +928,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }),
         statuses,
       )
+    beginLocalMutation()
     set((state) => ({
       cleaningPlaceStatuses: applyRooms(state.cleaningPlaceStatuses),
       tasks: input.roomCodes.reduce(
@@ -918,6 +953,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           assignCleanerId: input.assignCleanerId || undefined,
         },
       })
+      endLocalMutation()
       await get().refreshState()
       set((state) => ({
         toasts: addToast(
@@ -927,6 +963,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       }))
     } catch (error) {
+      endLocalMutation()
       set((state) => ({
         cleaningPlaceStatuses: previousStatuses,
         tasks: previousTasks,
@@ -1071,6 +1108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Optimistic: the cleaner activity panel reflects the new owner right
     // away, then the server confirms in the background.
     const previousTasks = get().tasks
+    beginLocalMutation()
     set((state) => ({
       tasks: state.tasks.map((task) =>
         task.id === taskId ? { ...task, assignedTo: cleanerId, startedAt: undefined } : task,
@@ -1082,11 +1120,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         token: get().accessToken,
         body: { cleanerId },
       })
+      endLocalMutation()
       await get().refreshState()
       set((state) => ({
         toasts: addToast(state.toasts, 'Cleaning task assigned', 'The task was assigned to the selected cleaner.', 'info'),
       }))
     } catch (error) {
+      endLocalMutation()
       set((state) => ({
         tasks: previousTasks,
         toasts: addToast(
@@ -1103,6 +1143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   unassignCleaningTask: async (taskId) => {
     // Optimistic: drop the cleaner from the activity panel instantly.
     const previousTasks = get().tasks
+    beginLocalMutation()
     set((state) => ({
       tasks: state.tasks.map((task) =>
         task.id === taskId
@@ -1115,11 +1156,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: 'POST',
         token: get().accessToken,
       })
+      endLocalMutation()
       await get().refreshState()
       set((state) => ({
         toasts: addToast(state.toasts, 'Assignment removed', 'The room was returned to the cleaning board.', 'info'),
       }))
     } catch (error) {
+      endLocalMutation()
       set((state) => ({
         tasks: previousTasks,
         toasts: addToast(

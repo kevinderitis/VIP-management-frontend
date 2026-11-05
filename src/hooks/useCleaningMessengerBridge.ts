@@ -48,12 +48,11 @@ const sendBoardUpdate = async (
   board: CleaningBroadcastBoard,
   completedTasks: CleaningTaskSnapshot[],
 ) => {
-  // When the last room/place on the list is cleaned, the updated list would be
-  // empty. Skip that message and only confirm that the room is ready, so the
-  // group does not receive an empty cleaning request.
+  // Never send an empty cleaning list. When the last room/place leaves the
+  // board the group only needs the ready confirmation, and a bulk action that
+  // clears everything should not announce "no rooms to clean".
   const hasPendingItems = board.rooms.length > 0 || board.places.length > 0
-  const shouldSendList = hasPendingItems || completedTasks.length === 0
-  const listSkipped = !shouldSendList
+  const shouldSendList = hasPendingItems
 
   let listSent = false
   if (shouldSendList) {
@@ -93,7 +92,7 @@ const sendBoardUpdate = async (
         : 'The room ready confirmation could not be sent to the Messenger group.',
       'warning',
     )
-  } else if (listSkipped && readySent > 0) {
+  } else if (!shouldSendList && readySent > 0) {
     // The list was skipped because it would be empty; confirm that the ready
     // message did reach the group.
     pushToast(
