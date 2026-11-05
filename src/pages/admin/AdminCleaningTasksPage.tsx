@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { AlertTriangle, BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
@@ -185,6 +185,25 @@ export const AdminCleaningTasksPage = () => {
     [tasks],
   )
 
+  const hasCleanerActivity = useMemo(
+    () =>
+      cleaningTasks.some(
+        (task) => Boolean(task.assignedTo) && ['assigned', 'scheduled'].includes(task.status),
+      ),
+    [cleaningTasks],
+  )
+
+  // Empty panels hide themselves; as soon as a cleaner gets work assigned the
+  // panel comes back. The Hide/Show cleaners button still overrides it while
+  // there is something to show.
+  const [previousHasCleanerActivity, setPreviousHasCleanerActivity] = useState(hasCleanerActivity)
+  if (previousHasCleanerActivity !== hasCleanerActivity) {
+    setPreviousHasCleanerActivity(hasCleanerActivity)
+    if (hasCleanerActivity) setCleanerActivityOpen(true)
+  }
+
+  const showCleanerActivity = cleanerActivityOpen && hasCleanerActivity
+
   const filteredTasks = useMemo(
     () =>
       cleaningTasks.filter((task) => {
@@ -276,14 +295,13 @@ export const AdminCleaningTasksPage = () => {
   )
 
   const totalBedConflictPages = Math.max(1, Math.ceil(filteredBedConflicts.length / bedConflictsPageSize))
+  // Clamp during render instead of syncing with an effect, so filters that
+  // shrink the list never leave the table on an out-of-range page.
+  const bedConflictsPageIndex = Math.min(bedConflictsPage, totalBedConflictPages)
   const paginatedBedConflicts = filteredBedConflicts.slice(
-    (bedConflictsPage - 1) * bedConflictsPageSize,
-    bedConflictsPage * bedConflictsPageSize,
+    (bedConflictsPageIndex - 1) * bedConflictsPageSize,
+    bedConflictsPageIndex * bedConflictsPageSize,
   )
-
-  useEffect(() => {
-    setBedConflictsPage((current) => Math.min(current, totalBedConflictPages))
-  }, [totalBedConflictPages])
 
   const currentStatus = useMemo(() => {
     if (!selectedPlace) return undefined
@@ -363,7 +381,7 @@ export const AdminCleaningTasksPage = () => {
 
       <div
         className={`grid min-w-0 gap-6 ${
-          cleanerActivityOpen ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start' : ''
+          showCleanerActivity ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start' : ''
         }`}
       >
         <Panel className="overflow-hidden p-6">
@@ -391,11 +409,12 @@ export const AdminCleaningTasksPage = () => {
             <Button
               size="sm"
               variant="secondary"
+              disabled={!hasCleanerActivity}
               onClick={() => setCleanerActivityOpen((current) => !current)}
               className="whitespace-nowrap"
             >
-              {cleanerActivityOpen ? <EyeOff size={15} className="mr-2" /> : <Eye size={15} className="mr-2" />}
-              {cleanerActivityOpen ? 'Hide cleaners' : 'Show cleaners'}
+              {showCleanerActivity ? <EyeOff size={15} className="mr-2" /> : <Eye size={15} className="mr-2" />}
+              {showCleanerActivity ? 'Hide cleaners' : 'Show cleaners'}
             </Button>
           </div>
         </div>
@@ -501,7 +520,7 @@ export const AdminCleaningTasksPage = () => {
         ) : null}
         </Panel>
 
-        {cleanerActivityOpen ? (
+        {showCleanerActivity ? (
           <CleanerActivityPanel
             tasks={tasks}
             cleaners={cleaners}
@@ -697,16 +716,18 @@ export const AdminCleaningTasksPage = () => {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={bedConflictsPage === 1}
-                    onClick={() => setBedConflictsPage((current) => Math.max(1, current - 1))}
+                    disabled={bedConflictsPageIndex === 1}
+                    onClick={() => setBedConflictsPage(Math.max(1, bedConflictsPageIndex - 1))}
                   >
                     Previous
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={bedConflictsPage === totalBedConflictPages}
-                    onClick={() => setBedConflictsPage((current) => Math.min(totalBedConflictPages, current + 1))}
+                    disabled={bedConflictsPageIndex === totalBedConflictPages}
+                    onClick={() =>
+                      setBedConflictsPage(Math.min(totalBedConflictPages, bedConflictsPageIndex + 1))
+                    }
                   >
                     Next
                   </Button>
