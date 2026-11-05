@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { AlertTriangle, BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus } from 'lucide-react'
+import { AlertTriangle, BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Pencil, Plus, Search, SendToBack, SprayCan, Trash2, UserCog, UserPlus, UserRound } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -109,6 +109,7 @@ const deriveRoomBoardState = (room: CleaningRoom, customStatus: CleaningPlaceSta
     roomType: customStatus?.roomType ?? room.roomType,
     occupiedCount,
     needsMakingCount,
+    cleanerId: activeCleaningTask?.assignedTo,
   }
 }
 
@@ -246,14 +247,17 @@ export const AdminCleaningTasksPage = () => {
             (task) => task.cleaningLocationType === 'room' && task.cleaningRoomCode === room.code,
           )
           const derivedStatus = deriveRoomBoardState(room, customStatus, relatedTasks)
+          const cleanerName = derivedStatus.cleanerId
+            ? cleaners.find((cleaner) => cleaner.id === derivedStatus.cleanerId)?.name
+            : undefined
 
-          return { room, status: derivedStatus }
+          return { room, status: derivedStatus, cleanerName }
         })
         .filter(({ status }) => !hideCleanRooms || status.primaryLabel !== 'Clean'),
     }))
 
     return grouped.filter((group) => group.rooms.length > 0)
-  }, [activeStays, cleaningPlaceStatuses, cleaningRooms, hideCleanRooms, roomBoardSearch, roomTypeFilter, sectionFilter, tasks])
+  }, [cleaningPlaceStatuses, cleaningRooms, cleaners, hideCleanRooms, roomBoardSearch, roomTypeFilter, sectionFilter, tasks])
 
   const customPlaceCards = useMemo(
     () =>
@@ -478,7 +482,7 @@ export const AdminCleaningTasksPage = () => {
                 <span className="text-sm text-slate-500">{group.rooms.length} rooms</span>
               </div>
               <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
-                {group.rooms.map(({ room, status }) => (
+                {group.rooms.map(({ room, status, cleanerName }) => (
                   <button
                     key={room.id}
                     type="button"
@@ -496,7 +500,13 @@ export const AdminCleaningTasksPage = () => {
                       </div>
                       {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
                     </div>
-                    <div className="mt-4 flex flex-wrap gap-1.5">
+                    {cleanerName ? (
+                      <p className="mt-2 flex items-start gap-1 break-words text-xs font-semibold text-white">
+                        <UserRound size={13} className="mt-0.5 shrink-0" />
+                        <span className="min-w-0 break-words">{cleanerName}</span>
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                       {status.badges.map((badge) => (
                         <span
                           key={`${room.code}-${badge.label}`}

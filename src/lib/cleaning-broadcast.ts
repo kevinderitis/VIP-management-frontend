@@ -12,6 +12,7 @@ export interface BroadcastRoomInfo {
   bedCount: number
   statusLabel?: string
   assigneeId?: string
+  assigneeName?: string
   taskStatus?: Task['status']
   bedStates: string
   trashRequested?: boolean
@@ -21,6 +22,7 @@ export interface BroadcastPlaceInfo {
   name: string
   statusLabel?: string
   assigneeId?: string
+  assigneeName?: string
   taskStatus?: Task['status']
   bedStates: string
   trashRequested?: boolean
@@ -62,7 +64,7 @@ export function collectRoomsNeedingCleaning(
   rooms: CleaningRoom[],
   statuses: CleaningPlaceStatus[],
   tasks: Task[],
-  options?: { excludeRoomCodes?: string[] },
+  options?: { excludeRoomCodes?: string[]; cleanerNames?: Map<string, string> },
 ): BroadcastRoomInfo[] {
   const excluded = new Set(options?.excludeRoomCodes ?? [])
   const result: BroadcastRoomInfo[] = []
@@ -92,6 +94,7 @@ export function collectRoomsNeedingCleaning(
       bedCount: room.bedCount,
       statusLabel: status?.roomServiceLabel ?? status?.label,
       assigneeId: activeTask?.assignedTo,
+      assigneeName: activeTask?.assignedTo ? options?.cleanerNames?.get(activeTask.assignedTo) : undefined,
       taskStatus: activeTask?.status,
       bedStates: bedStateSignature(status?.beds),
       trashRequested: status?.trashRequested,
@@ -108,7 +111,7 @@ export function collectPlacesNeedingCleaning(
   areas: CleaningArea[],
   statuses: CleaningPlaceStatus[],
   tasks: Task[],
-  options?: { excludePlaceNames?: string[] },
+  options?: { excludePlaceNames?: string[]; cleanerNames?: Map<string, string> },
 ): BroadcastPlaceInfo[] {
   const excluded = new Set(options?.excludePlaceNames ?? [])
   const result: BroadcastPlaceInfo[] = []
@@ -136,6 +139,7 @@ export function collectPlacesNeedingCleaning(
       name: area.name,
       statusLabel: status?.label,
       assigneeId: activeTask?.assignedTo,
+      assigneeName: activeTask?.assignedTo ? options?.cleanerNames?.get(activeTask.assignedTo) : undefined,
       taskStatus: activeTask?.status,
       bedStates: bedStateSignature(status?.beds),
       trashRequested: status?.trashRequested,
@@ -161,6 +165,7 @@ export const cleaningBoardSignature = (board: CleaningBroadcastBoard) =>
         room.bedCount,
         room.statusLabel ?? '',
         room.assigneeId ?? '',
+        room.assigneeName ?? '',
         room.taskStatus ?? '',
         room.bedStates,
         room.trashRequested ? '1' : '0',
@@ -171,11 +176,18 @@ export const cleaningBoardSignature = (board: CleaningBroadcastBoard) =>
         place.name,
         place.statusLabel ?? '',
         place.assigneeId ?? '',
+        place.assigneeName ?? '',
         place.taskStatus ?? '',
         place.bedStates,
         place.trashRequested ? '1' : '0',
       ]),
   })
+
+const assignmentLabel = (place: { assigneeName?: string; assigneeId?: string }) => {
+  if (place.assigneeName) return `Assigned to ${place.assigneeName}`
+  if (place.assigneeId) return 'Assigned to a cleaner'
+  return ''
+}
 
 export function buildCleaningBroadcastMessage(
   board: CleaningBroadcastBoard,
@@ -208,7 +220,8 @@ export function buildCleaningBroadcastMessage(
         lines.push('')
         lines.push(`📍 ${currentSection}`)
       }
-      const detail = room.roomType === 'shared' ? 'Shared dorm' : 'Private'
+      const assignment = assignmentLabel(room)
+      const detail = assignment || (room.roomType === 'shared' ? 'Shared dorm' : 'Private')
       lines.push(`${counter}. Room ${room.code} — ${detail}`)
     }
   }
@@ -217,7 +230,8 @@ export function buildCleaningBroadcastMessage(
     if (rooms.length) lines.push('')
     lines.push(`Places to clean (${places.length}):`)
     places.forEach((place, index) => {
-      lines.push(`${index + 1}. ${place.name}`)
+      const assignment = assignmentLabel(place)
+      lines.push(`${index + 1}. ${place.name}${assignment ? ` — ${assignment}` : ''}`)
     })
   }
 

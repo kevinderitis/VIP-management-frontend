@@ -118,6 +118,7 @@ export const useCleaningMessengerBridge = () => {
   const cleaningAreas = useAppStore((state) => state.cleaningAreas)
   const cleaningPlaceStatuses = useAppStore((state) => state.cleaningPlaceStatuses)
   const tasks = useAppStore((state) => state.tasks)
+  const users = useAppStore((state) => state.users)
   const refreshState = useAppStore((state) => state.refreshState)
 
   const [reachable, setReachable] = useState(false)
@@ -167,13 +168,18 @@ export const useCleaningMessengerBridge = () => {
     }
   }, [accessToken, bridgeEnabled, refreshState])
 
+  const cleanerNames = useMemo(
+    () => new Map(users.map((user) => [user.id, user.name])),
+    [users],
+  )
+
   const roomsNeeding = useMemo(
-    () => collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks),
-    [cleaningPlaceStatuses, cleaningRooms, tasks],
+    () => collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks, { cleanerNames }),
+    [cleanerNames, cleaningPlaceStatuses, cleaningRooms, tasks],
   )
   const placesNeeding = useMemo(
-    () => collectPlacesNeedingCleaning(cleaningAreas, cleaningPlaceStatuses, tasks),
-    [cleaningAreas, cleaningPlaceStatuses, tasks],
+    () => collectPlacesNeedingCleaning(cleaningAreas, cleaningPlaceStatuses, tasks, { cleanerNames }),
+    [cleanerNames, cleaningAreas, cleaningPlaceStatuses, tasks],
   )
   const board = useMemo<CleaningBroadcastBoard>(
     () => ({ rooms: roomsNeeding, places: placesNeeding }),
