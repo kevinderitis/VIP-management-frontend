@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
+import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -158,6 +158,11 @@ export const AdminCleaningTasksPage = () => {
   const [cleanerActivityOpen, setCleanerActivityOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
+  const [pendingMenuKey, setPendingMenuKey] = useState<string | null>(null)
+  const [assignPendingKey, setAssignPendingKey] = useState<string | null>(null)
+  const [assignPendingCleanerId, setAssignPendingCleanerId] = useState('')
+  const [assignPendingSend, setAssignPendingSend] = useState(false)
+  const [assignPendingBusy, setAssignPendingBusy] = useState(false)
   const [sendingMessenger, setSendingMessenger] = useState(false)
   const [newRoom, setNewRoom] = useState<{
     code: string
@@ -222,6 +227,53 @@ export const AdminCleaningTasksPage = () => {
     return [...groups.entries()].sort((left, right) => left[0].localeCompare(right[0]))
   }, [cleaningRooms, pendingMessengerKeys])
 
+  const findCleaningTaskForKey = (key: string) => {
+    if (key.startsWith('room:')) {
+      const code = key.slice(5)
+      return tasks.find(
+        (task) =>
+          task.audience === 'cleaning' &&
+          task.cleaningLocationType === 'room' &&
+          task.cleaningRoomCode === code &&
+          ['assigned', 'available', 'scheduled'].includes(task.status),
+      )
+    }
+    const label = key.slice(7)
+    return tasks.find(
+      (task) =>
+        task.audience === 'cleaning' &&
+        task.cleaningLocationType === 'custom' &&
+        task.cleaningLocationLabel === label &&
+        ['assigned', 'available', 'scheduled'].includes(task.status),
+    )
+  }
+
+  const openAssignPending = (key: string) => {
+    setPendingMenuKey(null)
+    setAssignPendingKey(key)
+    const task = findCleaningTaskForKey(key)
+    setAssignPendingCleanerId(task?.assignedTo ?? '')
+    setAssignPendingSend(false)
+  }
+
+  const confirmAssignPending = async () => {
+    if (!assignPendingKey) return
+    const task = findCleaningTaskForKey(assignPendingKey)
+    if (!task) return
+    if (!assignPendingCleanerId) return
+    setAssignPendingBusy(true)
+    try {
+      await assignCleaningTask(task.id, assignPendingCleanerId)
+      if (assignPendingSend) {
+        await sendPendingMessenger([assignPendingKey])
+      }
+      setAssignPendingKey(null)
+    } catch (error) {
+      console.warn('Could not assign pending cleaner:', error)
+    } finally {
+      setAssignPendingBusy(false)
+    }
+  }
   const sendPendingMessenger = async (keys?: string[]) => {
     const keysToSend = keys ?? pendingMessengerKeys
     if (!keysToSend.length) return
@@ -688,16 +740,49 @@ export const AdminCleaningTasksPage = () => {
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{section}</p>
                   <ul className="grid gap-2">
                     {keys.map((key) => (
-                      <li key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                      <li key={key} className="relative flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
                         <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
-                        <button
-                          type="button"
-                          aria-label="Remove from pending list"
-                          onClick={() => setSentMessengerKeys((current) => [...new Set([...current, key])])}
-                          className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                        >
-                          <X size={16} />
-                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-label="Pending update actions"
+                            onClick={() => setPendingMenuKey((current) => (current === key ? null : key))}
+                            className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                          {pendingMenuKey === key ? (
+                            <>
+                              <button
+                                type="button"
+                                aria-label="Close actions menu"
+                                className="fixed inset-0 z-10 cursor-default"
+                                onClick={() => setPendingMenuKey(null)}
+                              />
+                              <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => openAssignPending(key)}
+                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                                >
+                                  <UserRound size={16} className="text-slate-500" />
+                                  Assign cleaner
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPendingMenuKey(null)
+                                    setSentMessengerKeys((current) => [...new Set([...current, key])])
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                >
+                                  <X size={16} />
+                                  Remove from pending
+                                </button>
+                              </div>
+                            </>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -719,6 +804,69 @@ export const AdminCleaningTasksPage = () => {
 
 
       </div>
+
+      <Modal
+        open={Boolean(assignPendingKey)}
+        onClose={() => {
+          if (!assignPendingBusy) setAssignPendingKey(null)
+        }}
+        title="Assign cleaner to pending update"
+        description="Choose the cleaner for this pending room or place."
+        panelClassName="max-w-md"
+      >
+        <div className="grid gap-4">
+          <label className="grid gap-2 text-sm font-medium text-ink">
+            Cleaner
+            <select
+              value={assignPendingCleanerId}
+              onChange={(event) => setAssignPendingCleanerId(event.target.value)}
+              className="rounded-2xl border-slate-200"
+            >
+              <option value="">Select a cleaner</option>
+              {cleaners
+                .filter((cleaner) => cleaner.isActive)
+                .map((cleaner) => (
+                  <option key={cleaner.id} value={cleaner.id}>
+                    {cleaner.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={assignPendingSend}
+              onChange={(event) => setAssignPendingSend(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block font-medium">Send Messenger update now</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                If unchecked, this item stays in the pending list.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={assignPendingBusy}
+              onClick={() => setAssignPendingKey(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={assignPendingBusy || !assignPendingCleanerId}
+              onClick={() => void confirmAssignPending()}
+            >
+              {assignPendingBusy ? 'Assigning...' : 'Assign'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <CleaningAreaEditorModal
         key={`area-editor-${selectedArea?.id ?? 'new'}-${areaOpen ? 'open' : 'closed'}`}
