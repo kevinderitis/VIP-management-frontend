@@ -346,6 +346,7 @@ const mapVolunteerInput = (input: VolunteerDraftInput) => ({
 const mapCleanerInput = (input: CleanerDraftInput) => ({
   ...input,
   email: input.email || undefined,
+  offDay: toApiEnum(input.offDay),
 })
 
 const mapCleaningTaskInput = (input: CleaningTaskDraftInput) => ({

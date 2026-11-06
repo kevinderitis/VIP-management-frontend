@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
-import { CleanerDraftInput, User } from '../../types/models'
+import { FormEvent, useState } from 'react'
+import { CleanerDraftInput, User, Weekday } from '../../types/models'
 import { generatePlayfulPassword } from '../../utils/password'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
@@ -11,6 +11,7 @@ const emptyForm: CleanerDraftInput = {
   password: '',
   title: '',
   shift: 'Morning',
+  offDay: 'sunday',
 }
 
 const getCleanerForm = (cleaner?: User | null): CleanerDraftInput =>
@@ -22,6 +23,7 @@ const getCleanerForm = (cleaner?: User | null): CleanerDraftInput =>
         password: cleaner.password,
         title: cleaner.title,
         shift: cleaner.shift ?? 'Morning',
+        offDay: cleaner.offDay ?? 'sunday',
       }
     : emptyForm
 
@@ -38,10 +40,6 @@ export const CleanerEditorModal = ({
 }) => {
   const [form, setForm] = useState(() => getCleanerForm(cleaner))
 
-  useEffect(() => {
-    setForm(getCleanerForm(cleaner))
-  }, [cleaner, open])
-
   const handleGeneratePassword = () => {
     setForm((prev) => ({ ...prev, password: generatePlayfulPassword() }))
   }
@@ -55,6 +53,7 @@ export const CleanerEditorModal = ({
       password: form.password.trim(),
       title: form.title.trim(),
       shift: form.shift.trim(),
+      offDay: form.offDay,
       name: form.name.trim(),
     })
     onClose()
@@ -119,6 +118,20 @@ export const CleanerEditorModal = ({
             onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
             className="rounded-2xl border-slate-200"
           />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-ink">
+          Off day
+          <select
+            value={form.offDay ?? 'sunday'}
+            onChange={(event) => setForm((prev) => ({ ...prev, offDay: event.target.value as Weekday }))}
+            className="rounded-2xl border-slate-200"
+          >
+            {['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map((day) => (
+              <option key={day} value={day}>
+                {day.charAt(0).toUpperCase() + day.slice(1)}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="grid gap-2 text-sm font-medium text-ink">
           Email

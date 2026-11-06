@@ -83,6 +83,15 @@ export const CleanerActivityPanel = ({
   const totalInProgress = groups.reduce((total, group) => total + group.inProgress.length, 0)
   const totalPending = groups.reduce((total, group) => total + group.pending.length, 0)
 
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const todayWeekday = weekdayKeys[new Date().getDay()]
+  const availableCleaners = cleaners.filter(
+    (cleaner) => cleaner.isActive && cleaner.offDay !== todayWeekday,
+  )
+  const offCleaners = cleaners.filter(
+    (cleaner) => cleaner.isActive && cleaner.offDay === todayWeekday,
+  )
+
   const removeCleanerName = useMemo(
     () => cleaners.find((cleaner) => cleaner.id === removeTask?.assignedTo)?.name ?? 'this cleaner',
     [cleaners, removeTask?.assignedTo],
@@ -132,6 +141,25 @@ export const CleanerActivityPanel = ({
           <p className="mt-2 text-sm text-slate-500">
             Cleaners with tasks assigned right now, split by the rooms they have started and the ones still pending.
           </p>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Available today</p>
+              <p className="mt-1 text-sm text-emerald-900">
+                {availableCleaners.length
+                  ? availableCleaners.map((cleaner) => cleaner.name).join(', ')
+                  : 'None'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Off today</p>
+              <p className="mt-1 text-sm text-slate-700">
+                {offCleaners.length
+                  ? offCleaners.map((cleaner) => cleaner.name).join(', ')
+                  : 'None'}
+              </p>
+            </div>
+          </div>
 
           {groups.length ? (
             <>

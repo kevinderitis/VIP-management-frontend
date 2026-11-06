@@ -11,7 +11,16 @@ import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { checkinsApi } from '../../lib/checkins'
-import { useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
+import {
+  buildCleaningBroadcastMessage,
+  collectPlacesNeedingCleaning,
+  collectRoomsNeedingCleaning,
+} from '../../lib/cleaning-broadcast'
+import {
+  isMessengerConfigured,
+  sendMessengerMessage,
+} from '../../lib/messenger'
+import { addToast, useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
 import { CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 
 const sectionOrder = ['Arena Hostel', 'Arena Boutique / Seaview', 'Le Club']
@@ -128,6 +137,7 @@ export const AdminCleaningTasksPage = () => {
   const bulkCreateBedTasks = useAppStore((state) => state.bulkCreateBedTasks)
   const bulkUpdateRoomCleaningStatus = useAppStore((state) => state.bulkUpdateRoomCleaningStatus)
   const cleaners = useCleanerUsers()
+  const cleanerNames = useMemo(() => new Map(cleaners.map((cleaner) => [cleaner.id, cleaner.name])), [cleaners])
   const volunteers = useVolunteerUsers().filter((volunteer) => volunteer.isActive)
 
   const [roomBoardSearch, setRoomBoardSearch] = useState('')
@@ -147,6 +157,8 @@ export const AdminCleaningTasksPage = () => {
   const [roomBoardOpen, setRoomBoardOpen] = useState(true)
   const [cleanerActivityOpen, setCleanerActivityOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
+  const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
+  const [sendingMessenger, setSendingMessenger] = useState(false)
   const [newRoom, setNewRoom] = useState<{
     code: string
     section: string
@@ -182,6 +194,57 @@ export const AdminCleaningTasksPage = () => {
   }
 
   const showCleanerActivity = cleanerActivityOpen && hasCleanerActivity
+
+  const needsCleaningKeys = useMemo(() => {
+    const roomKeys = collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks, { cleanerNames }).map(
+      (room) => `room:${room.code}`,
+    )
+    const placeKeys = collectPlacesNeedingCleaning(cleaningAreas, cleaningPlaceStatuses, tasks, { cleanerNames }).map(
+      (place) => `custom:${place.name}`,
+    )
+    return [...roomKeys, ...placeKeys]
+  }, [cleanerNames, cleaningAreas, cleaningPlaceStatuses, cleaningRooms, tasks])
+
+  const pendingMessengerKeys = useMemo(
+    () => needsCleaningKeys.filter((key) => !sentMessengerKeys.includes(key)),
+    [needsCleaningKeys, sentMessengerKeys],
+  )
+
+  const sendPendingMessenger = async (keys?: string[]) => {
+    const keysToSend = keys ?? pendingMessengerKeys
+    if (!keysToSend.length) return
+    const roomCodes = keysToSend.filter((key) => key.startsWith('room:')).map((key) => key.slice(5))
+    const placeLabels = keysToSend.filter((key) => key.startsWith('custom:')).map((key) => key.slice(7))
+
+    const rooms = collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks, { cleanerNames }).filter((room) =>
+      roomCodes.includes(room.code),
+    )
+    const places = collectPlacesNeedingCleaning(cleaningAreas, cleaningPlaceStatuses, tasks, { cleanerNames }).filter((place) =>
+      placeLabels.includes(place.name),
+    )
+
+    if (!rooms.length && !places.length) return
+
+    setSendingMessenger(true)
+    try {
+      await sendMessengerMessage(buildCleaningBroadcastMessage({ rooms, places }, 'Needs cleaning'))
+      setSentMessengerKeys((current) => [...new Set([...current, ...keysToSend])])
+      useAppStore.setState((state) => ({
+        toasts: addToast(state.toasts, 'Cleaning list sent', 'The Messenger group received the updated cleaning list.'),
+      }))
+    } catch (error) {
+      useAppStore.setState((state) => ({
+        toasts: addToast(
+          state.toasts,
+          'Messenger message failed',
+          error instanceof Error ? error.message : 'The Messenger group could not be notified.',
+          'warning',
+        ),
+      }))
+    } finally {
+      setSendingMessenger(false)
+    }
+  }
 
   const groupedRooms = useMemo(() => {
     const searchValue = roomBoardSearch.trim().toLowerCase()
@@ -465,6 +528,32 @@ export const AdminCleaningTasksPage = () => {
             onRemove={handleRemoveCleanerAssignment}
           />
         ) : null}
+
+        {pendingMessengerKeys.length ? (
+          <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Pending Messenger updates</h3>
+              <span className="text-sm text-slate-500">{pendingMessengerKeys.length} unsent</span>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              These rooms or places are marked as needing cleaning but have not been sent to Messenger yet.
+            </p>
+            <ul className="mt-4 grid gap-2">
+              {pendingMessengerKeys.map((key) => (
+                <li key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                  {key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}
+                </li>
+              ))}
+            </ul>
+            <Button
+              className="mt-4"
+              disabled={sendingMessenger || !isMessengerConfigured()}
+              onClick={() => void sendPendingMessenger()}
+            >
+              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
+            </Button>
+          </Panel>
+        ) : null}
       </div>
 
       <Panel className="p-6">
@@ -620,7 +709,20 @@ export const AdminCleaningTasksPage = () => {
           place={selectedPlace}
           currentStatus={currentStatus}
           cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
-          onSubmit={(input) => void upsertCleaningPlaceStatus(input)}
+          onSubmit={(input) => {
+            const needsCleaning = ['need cleaning', 'needs cleaning'].includes(input.label.trim().toLowerCase())
+            const key = input.placeType === 'room' ? `room:${input.roomCode}` : `custom:${input.placeLabel}`
+            void (async () => {
+              await upsertCleaningPlaceStatus(input)
+              if (needsCleaning) {
+                if (input.sendMessenger) {
+                  await sendPendingMessenger([key])
+                }
+              } else {
+                setSentMessengerKeys((current) => current.filter((item) => item !== key))
+              }
+            })()
+          }}
         />
       ) : null}
 
@@ -662,6 +764,16 @@ export const AdminCleaningTasksPage = () => {
               trashTaskPoints: roomConfig.trashTaskPoints,
               isActive: selectedRoom.isActive,
             })
+
+            const needsCleaning = ['need cleaning', 'needs cleaning'].includes(input.label.trim().toLowerCase())
+            const key = `room:${input.roomCode}`
+            if (needsCleaning) {
+              if (input.sendMessenger) {
+                await sendPendingMessenger([key])
+              }
+            } else {
+              setSentMessengerKeys((current) => current.filter((item) => item !== key))
+            }
           }}
         />
       ) : null}

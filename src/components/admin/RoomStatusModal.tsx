@@ -84,6 +84,7 @@ export const RoomStatusModal = ({
   const [checkTaskPoints, setCheckTaskPoints] = useState(room.checkTaskPoints ?? 10)
   const [trashTaskPoints, setTrashTaskPoints] = useState(room.trashTaskPoints ?? 10)
   const [trashRequested, setTrashRequested] = useState(false)
+  const [sendMessenger, setSendMessenger] = useState(false)
   const [beds, setBeds] = useState<BedStatus[]>(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
   const [showStructureSettings, setShowStructureSettings] = useState(false)
   const [editingBedNumber, setEditingBedNumber] = useState<number | null>(null)
@@ -108,6 +109,7 @@ export const RoomStatusModal = ({
     setCheckTaskPoints(room.checkTaskPoints ?? 10)
     setTrashTaskPoints(room.trashTaskPoints ?? 10)
     setTrashRequested(false)
+    setSendMessenger(false)
     setBeds(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
     setShowStructureSettings(false)
     setEditingBedNumber(null)
@@ -312,6 +314,7 @@ export const RoomStatusModal = ({
             : undefined,
           assignVolunteerId: hasBedsToAssign ? assignVolunteerId || undefined : undefined,
           applyVolunteerAssignment: hasBedsToAssign,
+          sendMessenger,
         },
         {
           roomType,
@@ -585,6 +588,21 @@ export const RoomStatusModal = ({
               </span>
             </label>
 
+            <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={sendMessenger}
+                onChange={(event) => setSendMessenger(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium">Send Messenger update now</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  If unchecked, this room stays in the pending Messenger list.
+                </span>
+              </span>
+            </label>
+
             <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {visibleBeds.map(renderBedTile)}
@@ -822,6 +840,21 @@ export const RoomStatusModal = ({
                 <span className="block font-medium">Take out trash</span>
                 <span className="mt-1 block text-xs text-slate-500">
                   Creates a volunteer task for this room worth {trashTaskPoints} points.
+                </span>
+              </span>
+            </span>
+
+            <span className="flex items-start gap-3 text-sm font-normal text-ink">
+              <input
+                type="checkbox"
+                checked={sendMessenger}
+                onChange={(event) => setSendMessenger(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium">Send Messenger update now</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  If unchecked, this room stays in the pending Messenger list.
                 </span>
               </span>
             </span>

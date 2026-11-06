@@ -365,6 +365,7 @@ export interface CleanerDraftInput {
   password: string
   title: string
   shift: string
+  offDay?: Weekday
 }
 
 export interface CleaningPlaceStatusDraftInput {
@@ -382,6 +383,7 @@ export interface CleaningPlaceStatusDraftInput {
   assignCleanerId?: string
   assignVolunteerId?: string
   applyVolunteerAssignment?: boolean
+  sendMessenger?: boolean
 }
 
 export interface RewardDraftInput {

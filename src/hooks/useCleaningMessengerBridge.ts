@@ -55,8 +55,9 @@ const sendBoardUpdate = async (
   // Never send an empty cleaning list. When the last room/place leaves the
   // board the group only needs the ready confirmation, and a bulk action that
   // clears everything should not announce "no rooms to clean".
-  const hasPendingItems = board.rooms.length > 0 || board.places.length > 0
-  const shouldSendList = hasPendingItems
+  // Automatic Messenger list sends are disabled. Room updates only add the
+  // room to the pending list unless the admin explicitly asks to send it.
+  const shouldSendList = false
 
   let listSent = false
   if (shouldSendList) {

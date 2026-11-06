@@ -28,6 +28,7 @@ export const CleaningPlaceStatusModal = ({
   const [label, setLabel] = useState(currentStatus?.label ?? 'Clean')
   const [color, setColor] = useState(currentStatus?.color ?? '#22c55e')
   const [assignCleanerId, setAssignCleanerId] = useState('')
+  const [sendMessenger, setSendMessenger] = useState(false)
   const needsCleaning = ['need cleaning', 'needs cleaning'].includes(label.trim().toLowerCase())
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -37,6 +38,7 @@ export const CleaningPlaceStatusModal = ({
       label,
       color,
       assignCleanerId: needsCleaning && assignCleanerId ? assignCleanerId : undefined,
+      sendMessenger,
     })
     onClose()
   }
@@ -106,6 +108,20 @@ export const CleaningPlaceStatusModal = ({
         <div className="rounded-[24px] bg-mist px-4 py-4 text-sm text-slate-600">
           Setting a place to Need cleaning will create or republish a cleaning task automatically.
         </div>
+        <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+          <input
+            type="checkbox"
+            checked={sendMessenger}
+            onChange={(event) => setSendMessenger(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            <span className="block font-medium">Send Messenger update now</span>
+            <span className="mt-1 block text-xs text-slate-500">
+              If unchecked, this place stays in the pending Messenger list.
+            </span>
+          </span>
+        </label>
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
