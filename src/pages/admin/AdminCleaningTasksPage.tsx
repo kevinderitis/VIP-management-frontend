@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Search, SprayCan, UserCog, UserRound } from 'lucide-react'
+import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -672,18 +672,34 @@ export const AdminCleaningTasksPage = () => {
             </p>
             <ul className="mt-4 grid gap-2">
               {pendingMessengerKeys.map((key) => (
-                <li key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                  {key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}
+                <li key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                  <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
+                  <button
+                    type="button"
+                    aria-label="Remove from pending list"
+                    onClick={() => setSentMessengerKeys((current) => [...new Set([...current, key])])}
+                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                  >
+                    <X size={16} />
+                  </button>
                 </li>
               ))}
             </ul>
-            <Button
-              className="mt-4"
-              disabled={sendingMessenger || !isMessengerConfigured()}
-              onClick={() => void sendPendingMessenger()}
-            >
-              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                disabled={sendingMessenger || !isMessengerConfigured()}
+                onClick={() => void sendPendingMessenger()}
+              >
+                {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={sendingMessenger}
+                onClick={() => setSentMessengerKeys((current) => [...new Set([...current, ...pendingMessengerKeys])])}
+              >
+                Clear all
+              </Button>
+            </div>
           </Panel>
         ) : null}
       </div>
