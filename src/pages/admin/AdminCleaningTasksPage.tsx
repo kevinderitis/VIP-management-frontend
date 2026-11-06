@@ -378,6 +378,7 @@ export const AdminCleaningTasksPage = () => {
           showCleanerActivity ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start' : ''
         }`}
       >
+        <div className="grid min-w-0 gap-6">
         <Panel className="overflow-hidden p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
@@ -520,42 +521,6 @@ export const AdminCleaningTasksPage = () => {
         ) : null}
         </Panel>
 
-        {showCleanerActivity ? (
-          <CleanerActivityPanel
-            tasks={tasks}
-            cleaners={cleaners}
-            onReassign={(taskId, cleanerId) => assignCleaningTask(taskId, cleanerId)}
-            onRemove={handleRemoveCleanerAssignment}
-          />
-        ) : null}
-
-        {pendingMessengerKeys.length ? (
-          <Panel className="p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Pending Messenger updates</h3>
-              <span className="text-sm text-slate-500">{pendingMessengerKeys.length} unsent</span>
-            </div>
-            <p className="mt-2 text-sm text-slate-500">
-              These rooms or places are marked as needing cleaning but have not been sent to Messenger yet.
-            </p>
-            <ul className="mt-4 grid gap-2">
-              {pendingMessengerKeys.map((key) => (
-                <li key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                  {key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}
-                </li>
-              ))}
-            </ul>
-            <Button
-              className="mt-4"
-              disabled={sendingMessenger || !isMessengerConfigured()}
-              onClick={() => void sendPendingMessenger()}
-            >
-              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
-            </Button>
-          </Panel>
-        ) : null}
-      </div>
-
       <Panel className="p-6">
         <div className="flex items-center justify-between gap-4">
           <button
@@ -684,8 +649,49 @@ export const AdminCleaningTasksPage = () => {
           </div>
         ) : null}
       </Panel>
+        </div>
+
+        <div className="grid min-w-0 gap-6">
+        {showCleanerActivity ? (
+          <CleanerActivityPanel
+            tasks={tasks}
+            cleaners={cleaners}
+            onReassign={(taskId, cleanerId) => assignCleaningTask(taskId, cleanerId)}
+            onRemove={handleRemoveCleanerAssignment}
+          />
+        ) : null}
+
+        {pendingMessengerKeys.length ? (
+          <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Pending Messenger updates</h3>
+              <span className="text-sm text-slate-500">{pendingMessengerKeys.length} unsent</span>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              These rooms or places are marked as needing cleaning but have not been sent to Messenger yet.
+            </p>
+            <ul className="mt-4 grid gap-2">
+              {pendingMessengerKeys.map((key) => (
+                <li key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                  {key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}
+                </li>
+              ))}
+            </ul>
+            <Button
+              className="mt-4"
+              disabled={sendingMessenger || !isMessengerConfigured()}
+              onClick={() => void sendPendingMessenger()}
+            >
+              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
+            </Button>
+          </Panel>
+        ) : null}
+      </div>
 
 
+
+
+      </div>
 
       <CleaningAreaEditorModal
         key={`area-editor-${selectedArea?.id ?? 'new'}-${areaOpen ? 'open' : 'closed'}`}
