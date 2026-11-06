@@ -210,6 +210,18 @@ export const AdminCleaningTasksPage = () => {
     [needsCleaningKeys, sentMessengerKeys],
   )
 
+  const pendingMessengerGroups = useMemo(() => {
+    const groups = new Map<string, string[]>()
+    for (const key of pendingMessengerKeys) {
+      const section = key.startsWith('room:')
+        ? cleaningRooms.find((room) => room.code === key.slice(5))?.section ?? 'Other'
+        : 'Custom places'
+      if (!groups.has(section)) groups.set(section, [])
+      groups.get(section)!.push(key)
+    }
+    return [...groups.entries()].sort((left, right) => left[0].localeCompare(right[0]))
+  }, [cleaningRooms, pendingMessengerKeys])
+
   const sendPendingMessenger = async (keys?: string[]) => {
     const keysToSend = keys ?? pendingMessengerKeys
     if (!keysToSend.length) return
@@ -670,36 +682,35 @@ export const AdminCleaningTasksPage = () => {
             <p className="mt-2 text-sm text-slate-500">
               These rooms or places are marked as needing cleaning but have not been sent to Messenger yet.
             </p>
-            <ul className="mt-4 grid gap-2">
-              {pendingMessengerKeys.map((key) => (
-                <li key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                  <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
-                  <button
-                    type="button"
-                    aria-label="Remove from pending list"
-                    onClick={() => setSentMessengerKeys((current) => [...new Set([...current, key])])}
-                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                  >
-                    <X size={16} />
-                  </button>
-                </li>
+            <div className="mt-4 grid gap-4">
+              {pendingMessengerGroups.map(([section, keys]) => (
+                <div key={section}>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{section}</p>
+                  <ul className="grid gap-2">
+                    {keys.map((key) => (
+                      <li key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                        <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
+                        <button
+                          type="button"
+                          aria-label="Remove from pending list"
+                          onClick={() => setSentMessengerKeys((current) => [...new Set([...current, key])])}
+                          className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                disabled={sendingMessenger || !isMessengerConfigured()}
-                onClick={() => void sendPendingMessenger()}
-              >
-                {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={sendingMessenger}
-                onClick={() => setSentMessengerKeys((current) => [...new Set([...current, ...pendingMessengerKeys])])}
-              >
-                Clear all
-              </Button>
             </div>
+            <Button
+              className="mt-4"
+              disabled={sendingMessenger || !isMessengerConfigured()}
+              onClick={() => void sendPendingMessenger()}
+            >
+              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
+            </Button>
           </Panel>
         ) : null}
       </div>
