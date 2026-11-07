@@ -38,6 +38,7 @@ export const BulkRoomCleaningModal = ({
     label: string
     color: string
     assignCleanerId?: string
+    sendMessenger?: boolean
   }) => Promise<void> | void
 }) => {
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
@@ -45,6 +46,7 @@ export const BulkRoomCleaningModal = ({
   const [statusColor, setStatusColor] = useState(statusPresets[0].color)
   const [search, setSearch] = useState('')
   const [assignCleanerId, setAssignCleanerId] = useState('')
+  const [sendMessenger, setSendMessenger] = useState(false)
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export const BulkRoomCleaningModal = ({
     setStatusColor(statusPresets[0].color)
     setSearch('')
     setAssignCleanerId('')
+    setSendMessenger(false)
     setSending(false)
   }, [open])
 
@@ -107,6 +110,7 @@ export const BulkRoomCleaningModal = ({
       label: statusLabel,
       color: statusColor,
       assignCleanerId: assignCleanerId || undefined,
+      sendMessenger,
     }
 
     onClose()
@@ -228,8 +232,22 @@ export const BulkRoomCleaningModal = ({
               ))}
             </select>
             <span className="text-xs font-normal text-slate-500">
-              All selected rooms will be assigned to this cleaner at once. The updated
-              cleaning list is sent to the Messenger group automatically.
+              All selected rooms will be assigned to this cleaner at once. Use the checkbox below to decide whether to send the Messenger update.
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={sendMessenger}
+              onChange={(event) => setSendMessenger(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block font-medium">Send Messenger update now</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                If unchecked, these rooms stay in the pending Messenger list.
+              </span>
             </span>
           </label>
 

@@ -971,7 +971,18 @@ export const AdminCleaningTasksPage = () => {
           })),
         }))}
         cleaners={cleaners.filter((cleaner) => cleaner.isActive)}
-        onConfirmStatusChange={(input) => bulkUpdateRoomCleaningStatus(input)}
+        onConfirmStatusChange={async (input) => {
+          await bulkUpdateRoomCleaningStatus(input)
+          const keys = input.roomCodes.map((code) => `room:${code}`)
+          const needsCleaning = ['need cleaning', 'needs cleaning'].includes(input.label.trim().toLowerCase())
+          if (needsCleaning) {
+            if (input.sendMessenger) {
+              await sendPendingMessenger(keys)
+            }
+          } else {
+            setSentMessengerKeys((current) => current.filter((key) => !keys.includes(key)))
+          }
+        }}
       />
 
       <BulkBedTaskModal
