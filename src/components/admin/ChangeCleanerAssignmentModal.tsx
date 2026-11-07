@@ -23,6 +23,11 @@ export const ChangeCleanerAssignmentModal = ({
   const [selectedId, setSelectedId] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const todayWeekday = weekdayKeys[new Date().getDay()]
+  const selectedCleaner = cleaners.find((cleaner) => cleaner.id === selectedId)
+  const isCleanerOffToday = Boolean(selectedCleaner && selectedCleaner.offDay === todayWeekday)
+
   useEffect(() => {
     if (!open) return
     setSelectedId(task?.assignedTo ?? '')
@@ -86,6 +91,12 @@ export const ChangeCleanerAssignmentModal = ({
             </div>
           ) : null}
         </div>
+
+        {isCleanerOffToday ? (
+          <p className="text-sm font-semibold text-amber-600">
+            This cleaner is off today and may not be available.
+          </p>
+        ) : null}
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" onClick={onClose}>

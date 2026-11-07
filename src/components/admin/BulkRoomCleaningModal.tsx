@@ -49,6 +49,11 @@ export const BulkRoomCleaningModal = ({
   const [sendMessenger, setSendMessenger] = useState(false)
   const [sending, setSending] = useState(false)
 
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const todayWeekday = weekdayKeys[new Date().getDay()]
+  const selectedCleaner = cleaners.find((cleaner) => cleaner.id === assignCleanerId)
+  const isCleanerOffToday = Boolean(selectedCleaner && selectedCleaner.offDay === todayWeekday)
+
   useEffect(() => {
     if (!open) return
     setSelectedCodes(new Set())
@@ -234,6 +239,11 @@ export const BulkRoomCleaningModal = ({
             <span className="text-xs font-normal text-slate-500">
               All selected rooms will be assigned to this cleaner at once. Use the checkbox below to decide whether to send the Messenger update.
             </span>
+            {isCleanerOffToday ? (
+              <span className="text-xs font-semibold text-amber-600">
+                This cleaner is off today and may not be available.
+              </span>
+            ) : null}
           </label>
 
           <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">

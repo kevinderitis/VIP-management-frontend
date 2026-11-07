@@ -31,6 +31,11 @@ export const CleaningPlaceStatusModal = ({
   const [sendMessenger, setSendMessenger] = useState(false)
   const needsCleaning = ['need cleaning', 'needs cleaning'].includes(label.trim().toLowerCase())
 
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const todayWeekday = weekdayKeys[new Date().getDay()]
+  const selectedCleaner = cleaners.find((cleaner) => cleaner.id === assignCleanerId)
+  const isCleanerOffToday = Boolean(selectedCleaner && selectedCleaner.offDay === todayWeekday)
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSubmit({
@@ -103,6 +108,11 @@ export const CleaningPlaceStatusModal = ({
             <span className="text-xs font-normal text-slate-500">
               Optional. If selected, the cleaning task will be assigned right away.
             </span>
+            {isCleanerOffToday ? (
+              <span className="text-xs font-semibold text-amber-600">
+                This cleaner is off today and may not be available.
+              </span>
+            ) : null}
           </label>
         ) : null}
         <div className="rounded-[24px] bg-mist px-4 py-4 text-sm text-slate-600">

@@ -85,6 +85,11 @@ export const RoomStatusModal = ({
   const [trashTaskPoints, setTrashTaskPoints] = useState(room.trashTaskPoints ?? 10)
   const [trashRequested, setTrashRequested] = useState(false)
   const [sendMessenger, setSendMessenger] = useState(false)
+
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const todayWeekday = weekdayKeys[new Date().getDay()]
+  const selectedRoomCleaner = cleaners.find((cleaner) => cleaner.id === assignCleanerId)
+  const isRoomCleanerOffToday = Boolean(selectedRoomCleaner && selectedRoomCleaner.offDay === todayWeekday)
   const [beds, setBeds] = useState<BedStatus[]>(currentStatus?.beds.length ? currentStatus.beds : [defaultBed(1)])
   const [showStructureSettings, setShowStructureSettings] = useState(false)
   const [editingBedNumber, setEditingBedNumber] = useState<number | null>(null)
@@ -570,6 +575,11 @@ export const RoomStatusModal = ({
                     </option>
                   ))}
                 </select>
+              {isRoomCleanerOffToday ? (
+                <span className="text-xs font-semibold text-amber-600">
+                  This cleaner is off today and may not be available.
+                </span>
+              ) : null}
               </label>
             ) : null}
 
@@ -824,6 +834,11 @@ export const RoomStatusModal = ({
                   </option>
                 ))}
               </select>
+              {isRoomCleanerOffToday ? (
+                <span className="text-xs font-semibold text-amber-600">
+                  This cleaner is off today and may not be available.
+                </span>
+              ) : null}
             </label>
           ) : null}
 

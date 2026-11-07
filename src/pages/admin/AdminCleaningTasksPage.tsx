@@ -636,7 +636,7 @@ export const AdminCleaningTasksPage = () => {
                 <p className="mt-3 text-xs font-semibold text-teal">Tap to change status</p>
               </button>
 
-              <div className="absolute right-3 top-3">
+              <div className="absolute bottom-3 right-3">
                 <button
                   type="button"
                   aria-label="Custom place settings"
@@ -653,7 +653,7 @@ export const AdminCleaningTasksPage = () => {
                       className="fixed inset-0 z-10 cursor-default"
                       onClick={() => setOpenAreaManageId(null)}
                     />
-                    <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                    <div className="absolute bottom-full right-0 z-20 mb-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
                       <button
                         type="button"
                         onClick={() => {
@@ -816,6 +816,16 @@ export const AdminCleaningTasksPage = () => {
             </select>
           </label>
 
+          {(() => {
+            const cleaner = cleaners.find((item) => item.id === assignPendingCleanerId)
+            const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+            const todayWeekday = weekdayKeys[new Date().getDay()]
+            return cleaner && cleaner.offDay === todayWeekday ? (
+              <p className="text-sm font-semibold text-amber-600">
+                This cleaner is off today and may not be available.
+              </p>
+            ) : null
+          })()}
           <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
             <input
               type="checkbox"
