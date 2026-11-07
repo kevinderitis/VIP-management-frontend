@@ -17,7 +17,7 @@ self.addEventListener('push', (event) => {
   }
 
   const {
-    title = 'VolunteerFlow Hostel',
+    title = 'HostelOps',
     body,
     tag,
     url = '/',

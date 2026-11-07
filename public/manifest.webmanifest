@@ -1,6 +1,6 @@
 {
-  "name": "VolunteerFlow Hostel",
-  "short_name": "VolunteerFlow",
+  "name": "HostelOps",
+  "short_name": "HostelOps",
   "description": "Hostel operations for volunteers, cleaning shifts, assignments, and rewards.",
   "start_url": "/",
   "display": "standalone",

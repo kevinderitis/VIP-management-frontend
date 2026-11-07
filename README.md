@@ -1,4 +1,4 @@
-# VolunteerFlow Hostel
+# HostelOps
 
 Frontend conceptual y funcional para gestionar voluntarios, tareas, packs de temporada y recompensas en un hostel. Esta primera etapa usa datos mock en memoria con un store local reactivo, pero la estructura ya está pensada para conectar un backend en Node.js sin reescribir la app.
 

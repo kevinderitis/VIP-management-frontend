@@ -45,7 +45,7 @@ export const LoginPage = () => {
         <section className="relative hidden overflow-hidden rounded-[38px] bg-admin px-7 py-8 text-white shadow-soft sm:px-10 sm:py-10 lg:block">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(45,212,191,0.18),_transparent_26%)]" />
           <div className="relative">
-            <p className="text-xs uppercase tracking-[0.34em] text-white/60">VolunteerFlow Hostel</p>
+            <p className="text-xs uppercase tracking-[0.34em] text-white/60">HostelOps</p>
             <h1 className="mt-5 max-w-xl font-display text-4xl font-semibold leading-tight sm:text-5xl">
               Sign in to your hostel workspace.
             </h1>

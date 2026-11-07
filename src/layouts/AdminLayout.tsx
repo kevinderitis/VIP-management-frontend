@@ -165,7 +165,7 @@ export const AdminLayout = () => {
               </div>
             ) : (
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">HostelOps</p>
                 <p className="mt-3 text-xs font-medium text-white/75">{user?.name}</p>
                 <p className="mt-1 text-[11px] text-white/50">{user?.title}</p>
               </div>
@@ -258,7 +258,7 @@ export const AdminLayout = () => {
                   <p className="text-xs uppercase tracking-[0.25em] text-teal">{headerState.eyebrow}</p>
                 ) : null}
                 <p className="mt-1 font-display text-2xl font-semibold text-ink">
-                  {headerState?.title ?? 'VolunteerFlow'}
+                  {headerState?.title ?? 'HostelOps'}
                 </p>
                 {headerState?.description ? (
                   <p className="mt-1 max-w-2xl text-sm text-slate-500">{headerState.description}</p>
@@ -296,7 +296,7 @@ export const AdminLayout = () => {
           <div className="absolute inset-y-0 left-0 flex w-[86vw] max-w-[340px] flex-col bg-admin px-5 py-5 text-white shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">VolunteerFlow</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">HostelOps</p>
                 <p className="mt-2 font-display text-2xl font-semibold">Admin menu</p>
               </div>
               <button
