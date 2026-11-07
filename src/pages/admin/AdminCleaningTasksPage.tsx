@@ -23,7 +23,7 @@ import {
 import { addToast, useAppStore, useCleanerUsers, useVolunteerUsers } from '../../store/app-store'
 import { CleaningArea, CleaningPlaceStatus, CleaningPlaceStatusDraftInput, CleaningRoom, Task } from '../../types/models'
 
-const sectionOrder = ['Arena Hostel', 'Arena Boutique / Seaview', 'Le Club']
+const sectionOrder = ['Arena', 'Leo', 'Le Club']
 
 const fallbackStatus = { label: 'No status', color: '#cbd5e1', beds: [] }
 const activeTaskStatuses = ['assigned', 'available', 'scheduled']
