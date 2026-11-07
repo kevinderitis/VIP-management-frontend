@@ -329,6 +329,14 @@ export const AdminCleaningTasksPage = () => {
       section,
       rooms: rooms
         .filter((room) => room.section === section)
+        .sort((left, right) => {
+          const leftNumber = Number.parseInt(left.code, 10)
+          const rightNumber = Number.parseInt(right.code, 10)
+          if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber) && leftNumber !== rightNumber) {
+            return leftNumber - rightNumber
+          }
+          return left.code.localeCompare(right.code, undefined, { numeric: true, sensitivity: 'base' })
+        })
         .map((room) => {
           const customStatus = cleaningPlaceStatuses.find(
             (status) => status.placeType === 'room' && status.roomCode === room.code,
@@ -602,111 +610,86 @@ export const AdminCleaningTasksPage = () => {
         {customPlacesOpen ? (
           <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {customPlaceCards.map(({ area, status }) => (
-            <div key={area.id} className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-ink">{area.name}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">{status.label}</p>
-                </div>
-                <span className="h-7 w-7 rounded-full border border-white shadow-soft" style={{ backgroundColor: status.color }} />
-              </div>
-              <div className="mt-4 sm:hidden">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedPlace({
-                        placeType: 'custom',
-                        cleaningAreaId: area.id,
-                        placeLabel: area.name,
-                      })
-                      setStatusModalOpen(true)
-                    }}
-                  >
-                    Status
-                  </Button>
+            <div
+              key={area.id}
+              className="relative rounded-2xl bg-slate-50 p-4 transition hover:shadow-soft"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPlace({
+                    placeType: 'custom',
+                    cleaningAreaId: area.id,
+                    placeLabel: area.name,
+                  })
+                  setStatusModalOpen(true)
+                }}
+                className="block w-full text-left"
+              >
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setOpenAreaManageId(openAreaManageId === area.id ? null : area.id)}
-                    >
-                      <UserCog size={15} className="mr-2" />
-                      Manage
-                    </Button>
-                    {openAreaManageId === area.id ? (
-                      <div className="mt-2 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            setSelectedArea(area)
-                            setAreaOpen(true)
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleCleaningArea(area.id)}>
-                          {area.isActive ? 'Disable' : 'Enable'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            if (!window.confirm(`Delete "${area.name}" permanently?`)) return
-                            void deleteCleaningArea(area.id)
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    ) : null}
+                    <p className="font-semibold text-ink">{area.name}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">{status.label}</p>
                   </div>
+                  <span className="h-7 w-7 rounded-full border border-white shadow-soft" style={{ backgroundColor: status.color }} />
                 </div>
-              </div>
-              <div className="mt-4 hidden gap-2 sm:flex">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedPlace({
-                      placeType: 'custom',
-                      cleaningAreaId: area.id,
-                      placeLabel: area.name,
-                    })
-                    setStatusModalOpen(true)
-                  }}
+                <p className="mt-3 text-xs font-semibold text-teal">Tap to change status</p>
+              </button>
+
+              <div className="absolute right-3 top-3">
+                <button
+                  type="button"
+                  aria-label="Custom place settings"
+                  onClick={() => setOpenAreaManageId(openAreaManageId === area.id ? null : area.id)}
+                  className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-teal/40 hover:text-teal"
                 >
-                  Status
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedArea(area)
-                    setAreaOpen(true)
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => toggleCleaningArea(area.id)}>
-                  {area.isActive ? 'Disable' : 'Enable'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (!window.confirm(`Delete "${area.name}" permanently?`)) return
-                    void deleteCleaningArea(area.id)
-                  }}
-                >
-                  Delete
-                </Button>
+                  <MoreVertical size={16} />
+                </button>
+                {openAreaManageId === area.id ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close settings menu"
+                      className="fixed inset-0 z-10 cursor-default"
+                      onClick={() => setOpenAreaManageId(null)}
+                    />
+                    <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenAreaManageId(null)
+                          setSelectedArea(area)
+                          setAreaOpen(true)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                      >
+                        <UserCog size={16} className="text-slate-500" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenAreaManageId(null)
+                          void toggleCleaningArea(area.id)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                      >
+                        {area.isActive ? 'Disable' : 'Enable'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenAreaManageId(null)
+                          if (!window.confirm(`Delete "${area.name}" permanently?`)) return
+                          void deleteCleaningArea(area.id)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ))}
