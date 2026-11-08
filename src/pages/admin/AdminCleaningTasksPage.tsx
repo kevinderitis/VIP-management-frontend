@@ -161,7 +161,28 @@ export const AdminCleaningTasksPage = () => {
   const [checkoutsLoading, setCheckoutsLoading] = useState(false)
   const [checkoutsError, setCheckoutsError] = useState<string | null>(null)
   const [checkoutSendMessenger, setCheckoutSendMessenger] = useState(false)
+  const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
+  const dismissedStorageKey = (date: string) => `dismissed-checkouts-${date}`
+
+  const readDismissedCheckouts = (date: string) => {
+    try {
+      const raw = window.localStorage.getItem(dismissedStorageKey(date))
+      if (!raw) return new Set<string>()
+      return new Set<string>(JSON.parse(raw) as string[])
+    } catch {
+      return new Set<string>()
+    }
+  }
+
+  const writeDismissedCheckouts = (date: string, keys: Set<string>) => {
+    try {
+      window.localStorage.setItem(dismissedStorageKey(date), JSON.stringify([...keys]))
+    } catch {
+      // Ignore storage failures; the list still updates for this session.
+    }
+  }
+
   const loadCheckouts = async () => {
     const token = import.meta.env.VITE_MESSENGER_API_TOKEN
     const apiUrl = import.meta.env.VITE_MESSENGER_API_URL
@@ -177,7 +198,11 @@ export const AdminCleaningTasksPage = () => {
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
+      const date = String(data?.date ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
       const loaded = Array.isArray(data.checkouts) ? data.checkouts : []
+      const dismissed = readDismissedCheckouts(date)
+      setDismissedCheckouts(dismissed)
+      ;(window as any).__checkoutDate = date
       setCheckouts(
         loaded.filter((checkout: { name?: string }) => {
           const name = String(checkout?.name ?? '').toLowerCase()
@@ -191,8 +216,14 @@ export const AdminCleaningTasksPage = () => {
     }
   }
 
+  const checkoutDate = () => String((window as any).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+
   useEffect(() => {
     void loadCheckouts()
+    const interval = window.setInterval(() => {
+      void loadCheckouts()
+    }, 10 * 60 * 1000)
+    return () => window.clearInterval(interval)
   }, [])
   const [pendingMenuKey, setPendingMenuKey] = useState<string | null>(null)
   const [assignPendingKey, setAssignPendingKey] = useState<string | null>(null)
@@ -250,11 +281,18 @@ export const AdminCleaningTasksPage = () => {
     if (checkoutSendMessenger) {
       await sendPendingMessenger(keys)
     }
+    const dismissed = new Set([
+      ...dismissedCheckouts,
+      ...visibleCheckouts.map((checkout) => `${checkout.room}-${checkout.name}`),
+    ])
+    setDismissedCheckouts(dismissed)
+    writeDismissedCheckouts(checkoutDate(), dismissed)
     setCheckouts([])
   }
   const visibleCheckouts = checkouts.filter((checkout) => {
     const name = String(checkout?.name ?? '').toLowerCase()
     if (!name || name.includes('not available')) return false
+    if (dismissedCheckouts.has(`${checkout.room}-${checkout.name}`)) return false
 
     const status = cleaningPlaceStatuses.find(
       (entry) => entry.placeType === 'room' && entry.roomCode === String(checkout.room),
@@ -800,13 +838,19 @@ export const AdminCleaningTasksPage = () => {
                   <button
                     type="button"
                     aria-label="Remove checkout"
-                    onClick={() =>
+                    onClick={() => {
+                      const key = `${checkout.room}-${checkout.name}`
+                      setDismissedCheckouts((current) => {
+                        const next = new Set([...current, key])
+                        writeDismissedCheckouts(checkoutDate(), next)
+                        return next
+                      })
                       setCheckouts((current) =>
                         current.filter(
                           (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
                         ),
                       )
-                    }
+                    }}
                     className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
                   >
                     <X size={16} />
