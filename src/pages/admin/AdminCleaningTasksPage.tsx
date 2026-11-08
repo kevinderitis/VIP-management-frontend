@@ -250,6 +250,7 @@ export const AdminCleaningTasksPage = () => {
     if (checkoutSendMessenger) {
       await sendPendingMessenger(keys)
     }
+    setCheckouts([])
   }
   const visibleCheckouts = checkouts.filter((checkout) => {
     const name = String(checkout?.name ?? '').toLowerCase()
@@ -764,6 +765,80 @@ export const AdminCleaningTasksPage = () => {
           />
         ) : null}
 
+        {visibleCheckouts.length || checkoutsLoading || checkoutsError ? (
+        <Panel className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="section-title">Checkout rooms</h3>
+            <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
+              {checkoutsLoading ? 'Loading...' : 'Refresh'}
+            </Button>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
+          </p>
+
+          {checkoutsError ? (
+            <p className="mt-3 text-sm font-medium text-rose-600">{checkoutsError}</p>
+          ) : null}
+
+          {visibleCheckouts.length ? (
+            <ul className="mt-4 grid gap-2">
+              {visibleCheckouts.map((checkout) => (
+                <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">Room {checkout.room}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Remove checkout"
+                    onClick={() =>
+                      setCheckouts((current) =>
+                        current.filter(
+                          (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
+                        ),
+                      )
+                    }
+                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              {checkoutsLoading ? 'Loading checkouts...' : 'No checkouts to process.'}
+            </p>
+          )}
+
+          <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={checkoutSendMessenger}
+              onChange={(event) => setCheckoutSendMessenger(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block font-medium">Send Messenger update now</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                If unchecked, these rooms stay in the pending Messenger list.
+              </span>
+            </span>
+          </label>
+
+          <Button
+            className="mt-4"
+            disabled={!visibleCheckouts.length || checkoutsLoading}
+            onClick={() => void applyCheckouts()}
+          >
+            Apply checkouts
+          </Button>
+        </Panel>
+        ) : null}
+
         {pendingMessengerKeys.length ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
@@ -838,77 +913,6 @@ export const AdminCleaningTasksPage = () => {
           </Panel>
         ) : null}
 
-        <Panel className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="section-title">Checkout rooms</h3>
-            <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
-              {checkoutsLoading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </div>
-          <p className="mt-2 text-sm text-slate-500">
-            Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
-          </p>
-
-          {checkoutsError ? (
-            <p className="mt-3 text-sm font-medium text-rose-600">{checkoutsError}</p>
-          ) : null}
-
-          {visibleCheckouts.length ? (
-            <ul className="mt-4 grid gap-2">
-              {visibleCheckouts.map((checkout) => (
-                <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-ink">Room {checkout.room}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Remove checkout"
-                    onClick={() =>
-                      setCheckouts((current) =>
-                        current.filter(
-                          (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
-                        ),
-                      )
-                    }
-                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                  >
-                    <X size={16} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-sm text-slate-500">
-              {checkoutsLoading ? 'Loading checkouts...' : 'No checkouts to process.'}
-            </p>
-          )}
-
-          <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={checkoutSendMessenger}
-              onChange={(event) => setCheckoutSendMessenger(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium">Send Messenger update now</span>
-              <span className="mt-1 block text-xs text-slate-500">
-                If unchecked, these rooms stay in the pending Messenger list.
-              </span>
-            </span>
-          </label>
-
-          <Button
-            className="mt-4"
-            disabled={!visibleCheckouts.length || checkoutsLoading}
-            onClick={() => void applyCheckouts()}
-          >
-            Apply checkouts
-          </Button>
-        </Panel>
       </div>
 
 
