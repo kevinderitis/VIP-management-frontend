@@ -161,7 +161,6 @@ export const AdminCleaningTasksPage = () => {
   const [checkoutsLoading, setCheckoutsLoading] = useState(false)
   const [checkoutsError, setCheckoutsError] = useState<string | null>(null)
   const [checkoutSendMessenger, setCheckoutSendMessenger] = useState(false)
-  const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
   const loadCheckouts = async () => {
     const token = import.meta.env.VITE_MESSENGER_API_TOKEN
@@ -178,8 +177,13 @@ export const AdminCleaningTasksPage = () => {
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
-      setCheckouts(Array.isArray(data.checkouts) ? data.checkouts : [])
-      setDismissedCheckouts(new Set())
+      const loaded = Array.isArray(data.checkouts) ? data.checkouts : []
+      setCheckouts(
+        loaded.filter((checkout: { name?: string }) => {
+          const name = String(checkout?.name ?? '').toLowerCase()
+          return name && !name.includes('not available')
+        }),
+      )
     } catch (error) {
       setCheckoutsError(error instanceof Error ? error.message : 'Could not load checkouts')
     } finally {
@@ -246,9 +250,11 @@ export const AdminCleaningTasksPage = () => {
     if (checkoutSendMessenger) {
       await sendPendingMessenger(keys)
     }
-    setDismissedCheckouts(new Set(checkouts.map((checkout) => `${checkout.room}-${checkout.name}`)))
   }
-  const visibleCheckouts = checkouts.filter((checkout) => !dismissedCheckouts.has(`${checkout.room}-${checkout.name}`))
+  const visibleCheckouts = checkouts.filter((checkout) => {
+    const name = String(checkout?.name ?? '').toLowerCase()
+    return name && !name.includes('not available')
+  })
 
   const needsCleaningKeys = useMemo(() => {
     const roomKeys = collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks, { cleanerNames }).map(
@@ -861,7 +867,11 @@ export const AdminCleaningTasksPage = () => {
                     type="button"
                     aria-label="Remove checkout"
                     onClick={() =>
-                      setDismissedCheckouts((current) => new Set([...current, `${checkout.room}-${checkout.name}`]))
+                      setCheckouts((current) =>
+                        current.filter(
+                          (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
+                        ),
+                      )
                     }
                     className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
                   >
