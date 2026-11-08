@@ -839,6 +839,7 @@ export const AdminCleaningTasksPage = () => {
                     type="button"
                     aria-label="Remove checkout"
                     onClick={() => {
+                      if (!window.confirm('This checkout will not be shown again today. Continue?')) return
                       const key = `${checkout.room}-${checkout.name}`
                       setDismissedCheckouts((current) => {
                         const next = new Set([...current, key])
