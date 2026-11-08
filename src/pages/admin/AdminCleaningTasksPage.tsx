@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
@@ -157,7 +157,39 @@ export const AdminCleaningTasksPage = () => {
   const [roomBoardOpen, setRoomBoardOpen] = useState(true)
   const [cleanerActivityOpen, setCleanerActivityOpen] = useState(true)
   const [customPlacesOpen, setCustomPlacesOpen] = useState(true)
+  const [checkouts, setCheckouts] = useState<Array<{ name: string; state: number; comments: string; room: string }>>([])
+  const [checkoutsLoading, setCheckoutsLoading] = useState(false)
+  const [checkoutsError, setCheckoutsError] = useState<string | null>(null)
+  const [checkoutSendMessenger, setCheckoutSendMessenger] = useState(false)
+  const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
+  const loadCheckouts = async () => {
+    const token = import.meta.env.VITE_MESSENGER_API_TOKEN
+    const apiUrl = import.meta.env.VITE_MESSENGER_API_URL
+    const url = apiUrl
+      ? apiUrl.replace('/api/messenger/send', '/api/hfsql/checkouts/external')
+      : 'http://localhost:3000/api/hfsql/checkouts/external'
+
+    setCheckoutsLoading(true)
+    setCheckoutsError(null)
+    try {
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      setCheckouts(Array.isArray(data.checkouts) ? data.checkouts : [])
+      setDismissedCheckouts(new Set())
+    } catch (error) {
+      setCheckoutsError(error instanceof Error ? error.message : 'Could not load checkouts')
+    } finally {
+      setCheckoutsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadCheckouts()
+  }, [])
   const [pendingMenuKey, setPendingMenuKey] = useState<string | null>(null)
   const [assignPendingKey, setAssignPendingKey] = useState<string | null>(null)
   const [assignPendingCleanerId, setAssignPendingCleanerId] = useState('')
@@ -189,6 +221,9 @@ export const AdminCleaningTasksPage = () => {
     [cleaningTasks],
   )
 
+  const showCleanerActivity = cleanerActivityOpen && hasCleanerActivity
+
+
   // Empty panels hide themselves; as soon as a cleaner gets work assigned the
   // panel comes back. The Hide/Show cleaners button still overrides it while
   // there is something to show.
@@ -198,7 +233,22 @@ export const AdminCleaningTasksPage = () => {
     if (hasCleanerActivity) setCleanerActivityOpen(true)
   }
 
-  const showCleanerActivity = cleanerActivityOpen && hasCleanerActivity
+  const applyCheckouts = async () => {
+    if (!visibleCheckouts.length) return
+    const roomCodes = [...new Set(visibleCheckouts.map((checkout) => String(checkout.room)))]
+    await bulkUpdateRoomCleaningStatus({
+      roomCodes,
+      label: 'Needs cleaning',
+      color: '#ef4444',
+      sendMessenger: checkoutSendMessenger,
+    })
+    const keys = roomCodes.map((code) => `room:${code}`)
+    if (checkoutSendMessenger) {
+      await sendPendingMessenger(keys)
+    }
+    setDismissedCheckouts(new Set(checkouts.map((checkout) => `${checkout.room}-${checkout.name}`)))
+  }
+  const visibleCheckouts = checkouts.filter((checkout) => !dismissedCheckouts.has(`${checkout.room}-${checkout.name}`))
 
   const needsCleaningKeys = useMemo(() => {
     const roomKeys = collectRoomsNeedingCleaning(cleaningRooms, cleaningPlaceStatuses, tasks, { cleanerNames }).map(
@@ -781,6 +831,74 @@ export const AdminCleaningTasksPage = () => {
             </Button>
           </Panel>
         ) : null}
+
+        <Panel className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="section-title">Checkout rooms</h3>
+            <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
+              {checkoutsLoading ? 'Loading...' : 'Refresh'}
+            </Button>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
+          </p>
+
+          {checkoutsError ? (
+            <p className="mt-3 text-sm font-medium text-rose-600">{checkoutsError}</p>
+          ) : null}
+
+          {visibleCheckouts.length ? (
+            <ul className="mt-4 grid gap-2">
+              {visibleCheckouts.map((checkout) => (
+                <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">Room {checkout.room}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Remove checkout"
+                    onClick={() =>
+                      setDismissedCheckouts((current) => new Set([...current, `${checkout.room}-${checkout.name}`]))
+                    }
+                    className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              {checkoutsLoading ? 'Loading checkouts...' : 'No checkouts to process.'}
+            </p>
+          )}
+
+          <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={checkoutSendMessenger}
+              onChange={(event) => setCheckoutSendMessenger(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block font-medium">Send Messenger update now</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                If unchecked, these rooms stay in the pending Messenger list.
+              </span>
+            </span>
+          </label>
+
+          <Button
+            className="mt-4"
+            disabled={!visibleCheckouts.length || checkoutsLoading}
+            onClick={() => void applyCheckouts()}
+          >
+            Apply checkouts
+          </Button>
+        </Panel>
       </div>
 
 

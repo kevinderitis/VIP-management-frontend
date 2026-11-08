@@ -108,6 +108,7 @@ type AppState = ServerState & {
     label: string
     color: string
     assignCleanerId?: string
+    sendMessenger?: boolean
   }) => Promise<void>
   bulkCreateBedTasks: (input: {
     selections: BulkBedTaskSelection[]
