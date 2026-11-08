@@ -254,7 +254,13 @@ export const AdminCleaningTasksPage = () => {
   }
   const visibleCheckouts = checkouts.filter((checkout) => {
     const name = String(checkout?.name ?? '').toLowerCase()
-    return name && !name.includes('not available')
+    if (!name || name.includes('not available')) return false
+
+    const status = cleaningPlaceStatuses.find(
+      (entry) => entry.placeType === 'room' && entry.roomCode === String(checkout.room),
+    )
+    const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
+    return label === '' || label === 'clean' || label === 'occupied'
   })
 
   const needsCleaningKeys = useMemo(() => {
