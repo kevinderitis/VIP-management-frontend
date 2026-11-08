@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { BedDouble, ChevronDown, Eye, EyeOff, Grid2X2, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
+import { BedDouble, ChevronDown, Grid2X2, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -546,11 +546,7 @@ export const AdminCleaningTasksPage = () => {
         }
       />
 
-      <div
-        className={`grid min-w-0 gap-6 ${
-          showCleanerActivity ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start' : ''
-        }`}
-      >
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <div className="grid min-w-0 gap-6">
         <Panel className="overflow-hidden p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -573,16 +569,6 @@ export const AdminCleaningTasksPage = () => {
             <Button size="sm" onClick={() => setBulkCleaningOpen(true)} className="whitespace-nowrap">
               <SprayCan size={15} className="mr-2" />
               Bulk cleaning
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={!hasCleanerActivity}
-              onClick={() => setCleanerActivityOpen((current) => !current)}
-              className="whitespace-nowrap"
-            >
-              {showCleanerActivity ? <EyeOff size={15} className="mr-2" /> : <Eye size={15} className="mr-2" />}
-              {showCleanerActivity ? 'Hide cleaners' : 'Show cleaners'}
             </Button>
           </div>
         </div>
