@@ -210,7 +210,16 @@ export const AdminCleaningTasksPage = () => {
         }),
       )
     } catch (error) {
-      setCheckoutsError(error instanceof Error ? error.message : 'Could not load checkouts')
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
+      setCheckoutsError(
+        isNetworkError
+          ? 'No está conectado a Spinal. Abrí HostelOps Service.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not load checkouts',
+      )
     } finally {
       setCheckoutsLoading(false)
     }
@@ -808,7 +817,13 @@ export const AdminCleaningTasksPage = () => {
           </p>
 
           {checkoutsError ? (
-            <p className="mt-3 text-sm font-medium text-rose-600">{checkoutsError}</p>
+            <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
+              checkoutsError.includes('Spinal')
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-rose-200 bg-rose-50 text-rose-700'
+            }`}>
+              {checkoutsError}
+            </div>
           ) : null}
 
           {visibleCheckouts.length ? (
