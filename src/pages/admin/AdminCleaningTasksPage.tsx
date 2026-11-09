@@ -215,7 +215,7 @@ export const AdminCleaningTasksPage = () => {
         (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
       setCheckoutsError(
         isNetworkError
-          ? 'No está conectado a Spinal. Abrí HostelOps Service.'
+          ? 'Not connected to Spinal. Open HostelOps Service.'
           : error instanceof Error
             ? error.message
             : 'Could not load checkouts',
