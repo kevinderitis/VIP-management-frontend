@@ -161,6 +161,11 @@ export const AdminCleaningTasksPage = () => {
   const [checkoutsLoading, setCheckoutsLoading] = useState(false)
   const [checkoutsError, setCheckoutsError] = useState<string | null>(null)
   const [checkoutSendMessenger, setCheckoutSendMessenger] = useState(false)
+
+  const [checkins, setCheckins] = useState<Array<{ name: string; state: number; comments: string; room: string; property?: string | null; type?: string | null }>>([])
+  const [checkinsLoading, setCheckinsLoading] = useState(false)
+  const [checkinsError, setCheckinsError] = useState<string | null>(null)
+  const [dismissedCheckins, setDismissedCheckins] = useState<Set<string>>(new Set())
   const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
   const dismissedStorageKey = (date: string) => `dismissed-checkouts-${date}`
@@ -225,16 +230,68 @@ export const AdminCleaningTasksPage = () => {
     }
   }
 
+  const loadCheckins = async () => {
+    const token = import.meta.env.VITE_MESSENGER_API_TOKEN
+    const apiUrl = import.meta.env.VITE_MESSENGER_API_URL
+    const url = apiUrl
+      ? apiUrl.replace('/api/messenger/send', '/api/hfsql/checkins/external')
+      : 'http://localhost:3000/api/hfsql/checkins/external'
+
+    setCheckinsLoading(true)
+    setCheckinsError(null)
+    try {
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      const loaded = Array.isArray(data.checkins) ? data.checkins : []
+      const date = String(data?.date ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+      try {
+        const raw = window.localStorage.getItem(`dismissed-checkins-${date}`)
+        const dismissed = raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set<string>()
+        setDismissedCheckins(dismissed)
+      } catch {
+        setDismissedCheckins(new Set<string>())
+      }
+      ;(window as any).__checkinDate = date
+      setCheckins(
+        loaded.filter((checkin: { name?: string }) => {
+          const name = String(checkin?.name ?? '').toLowerCase()
+          return name && !name.includes('not available')
+        }),
+      )
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
+      setCheckinsError(
+        isNetworkError
+          ? 'Not connected to Spinal. Open HostelOps Service.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not load checkins',
+      )
+    } finally {
+      setCheckinsLoading(false)
+    }
+  }
+
+  const checkinDate = () => String((window as any).__checkinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+
   const checkoutDate = () => String((window as any).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
   useEffect(() => {
     void loadCheckouts()
+    void loadCheckins()
     const interval = window.setInterval(() => {
       void loadCheckouts()
+      void loadCheckins()
     }, 10 * 60 * 1000)
     return () => window.clearInterval(interval)
   }, [])
   const [pendingMenuKey, setPendingMenuKey] = useState<string | null>(null)
+  const [pendingMessengerModalOpen, setPendingMessengerModalOpen] = useState(false)
   const [assignPendingKey, setAssignPendingKey] = useState<string | null>(null)
   const [assignPendingCleanerId, setAssignPendingCleanerId] = useState('')
   const [assignPendingSend, setAssignPendingSend] = useState(false)
@@ -309,6 +366,70 @@ export const AdminCleaningTasksPage = () => {
     const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
     return label === '' || label === 'clean' || label === 'occupied'
   })
+
+  const visibleCheckins = checkins.filter((checkin) => {
+    const name = String(checkin?.name ?? '').toLowerCase()
+    if (!name || name.includes('not available')) return false
+    if (dismissedCheckins.has(`${checkin.room}-${checkin.name}`)) return false
+    return true
+  })
+
+  const checkinGroups = useMemo(() => {
+    const groups = new Map<string, typeof visibleCheckins>()
+    for (const checkin of visibleCheckins) {
+      const room = cleaningRooms.find((item) => item.code === String(checkin.room))
+      const section = (checkin.property ? String(checkin.property) : room?.section) ?? 'Other'
+      if (!groups.has(section)) groups.set(section, [])
+      groups.get(section)!.push(checkin)
+    }
+
+    return [...groups.entries()]
+      .sort((left, right) => {
+        const leftRank = sectionOrder.indexOf(left[0])
+        const rightRank = sectionOrder.indexOf(right[0])
+        const normalizedLeftRank = leftRank === -1 ? sectionOrder.length : leftRank
+        const normalizedRightRank = rightRank === -1 ? sectionOrder.length : rightRank
+        if (normalizedLeftRank !== normalizedRightRank) return normalizedLeftRank - normalizedRightRank
+        return left[0].localeCompare(right[0])
+      })
+      .map(([section, items]) => ({
+        section,
+        items: [...items].sort((left, right) => {
+          const leftNumber = Number.parseInt(String(left.room), 10)
+          const rightNumber = Number.parseInt(String(right.room), 10)
+          if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber) && leftNumber !== rightNumber) {
+            return leftNumber - rightNumber
+          }
+          const leftRoom = cleaningRooms.find((room) => room.code === String(left.room))
+          const rightRoom = cleaningRooms.find((room) => room.code === String(right.room))
+          if (leftRoom?.roomType !== rightRoom?.roomType) {
+            return leftRoom?.roomType === 'private' ? -1 : 1
+          }
+          return String(left.room).localeCompare(String(right.room), undefined, { numeric: true, sensitivity: 'base' })
+        }),
+      }))
+  }, [cleaningRooms, visibleCheckins])
+
+  const applyCheckins = async () => {
+    if (!visibleCheckins.length) return
+    const roomCodes = [...new Set(visibleCheckins.map((checkin) => String(checkin.room)))]
+    await bulkUpdateRoomCleaningStatus({
+      roomCodes,
+      label: 'Occupied',
+      color: '#3b82f6',
+    })
+    const dismissed = new Set([
+      ...dismissedCheckins,
+      ...visibleCheckins.map((checkin) => `${checkin.room}-${checkin.name}`),
+    ])
+    setDismissedCheckins(dismissed)
+    try {
+      window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...dismissed]))
+    } catch {
+      // Ignore storage failures.
+    }
+    setCheckins([])
+  }
 
   const checkoutGroups = useMemo(() => {
     const groups = new Map<string, typeof visibleCheckouts>()
@@ -848,198 +969,246 @@ export const AdminCleaningTasksPage = () => {
           />
         ) : null}
 
-        {visibleCheckouts.length || checkoutsLoading || checkoutsError ? (
-        <Panel className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="section-title">Checkout rooms</h3>
-            <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
-              {checkoutsLoading ? 'Loading...' : 'Refresh'}
-            </Button>
-          </div>
-          <p className="mt-2 text-sm text-slate-500">
-            Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
-          </p>
-
-          {checkoutsError ? (
-            <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
-              checkoutsError.includes('Spinal')
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-rose-200 bg-rose-50 text-rose-700'
-            }`}>
-              {checkoutsError}
+        {visibleCheckins.length || checkinsLoading || checkinsError ? (
+          <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Check-in rooms</h3>
+              <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
+                {checkinsLoading ? 'Loading...' : 'Refresh'}
+              </Button>
             </div>
-          ) : null}
-
-          {visibleCheckouts.length ? (
-            <div className="mt-4 grid gap-4">
-              {checkoutGroups.map((group) => {
-                const privateItems = group.items.filter((checkout) => {
-                  const room = cleaningRooms.find((item) => item.code === String(checkout.room))
-                  return room?.roomType === 'private'
-                })
-                const sharedItems = group.items.filter((checkout) => {
-                  const room = cleaningRooms.find((item) => item.code === String(checkout.room))
-                  return room?.roomType !== 'private'
-                })
-
-                const renderItem = (checkout: (typeof group.items)[number]) => (
-                  <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-ink">Room {checkout.room}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Remove checkout"
-                      onClick={() => {
-                        if (!window.confirm('This checkout will not be shown again today. Continue?')) return
-                        const key = `${checkout.room}-${checkout.name}`
-                        setDismissedCheckouts((current) => {
-                          const next = new Set([...current, key])
-                          writeDismissedCheckouts(checkoutDate(), next)
-                          return next
-                        })
-                        setCheckouts((current) =>
-                          current.filter(
-                            (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
-                          ),
-                        )
-                      }}
-                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                    >
-                      <X size={16} />
-                    </button>
-                  </li>
-                )
-
-                return (
-                  <div key={group.section}>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.section}</p>
-                    {privateItems.length ? (
-                      <div className="mb-3">
-                        <p className="mb-2 text-xs font-semibold text-slate-500">Private</p>
-                        <ul className="grid gap-2">
-                          {privateItems.map(renderItem)}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {sharedItems.length ? (
-                      <div>
-                        <p className="mb-2 text-xs font-semibold text-slate-500">Shared dorm</p>
-                        <ul className="grid gap-2">
-                          {sharedItems.map(renderItem)}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-slate-500">
-              {checkoutsLoading ? 'Loading checkouts...' : 'No checkouts to process.'}
+            <p className="mt-2 text-sm text-slate-500">
+              Rooms that have checked in today. Apply them to mark the rooms as occupied.
             </p>
-          )}
 
-          <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={checkoutSendMessenger}
-              onChange={(event) => setCheckoutSendMessenger(event.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              <span className="block font-medium">Send Messenger update now</span>
-              <span className="mt-1 block text-xs text-slate-500">
-                If unchecked, these rooms stay in the pending Messenger list.
+            {checkinsError ? (
+              <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                checkinsError.includes('Spinal')
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}>
+                {checkinsError}
+              </div>
+            ) : null}
+
+            {visibleCheckins.length ? (
+              <div className="mt-4 grid gap-4">
+                {checkinGroups.map((group) => {
+                  const privateItems = group.items.filter((checkin) => {
+                    const room = cleaningRooms.find((item) => item.code === String(checkin.room))
+                    return room?.roomType === 'private'
+                  })
+                  const sharedItems = group.items.filter((checkin) => {
+                    const room = cleaningRooms.find((item) => item.code === String(checkin.room))
+                    return room?.roomType !== 'private'
+                  })
+
+                  const renderItem = (checkin: (typeof group.items)[number]) => (
+                    <li key={`${checkin.room}-${checkin.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink">Room {checkin.room}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {checkin.name}{checkin.comments ? ` · ${checkin.comments}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Remove checkin"
+                        onClick={() => {
+                          if (!window.confirm('This check-in will not be shown again today. Continue?')) return
+                          const key = `${checkin.room}-${checkin.name}`
+                          setDismissedCheckins((current) => {
+                            const next = new Set([...current, key])
+                            try {
+                              window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...next]))
+                            } catch {
+                              // Ignore storage failures.
+                            }
+                            return next
+                          })
+                          setCheckins((current) =>
+                            current.filter(
+                              (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                            ),
+                          )
+                        }}
+                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <X size={16} />
+                      </button>
+                    </li>
+                  )
+
+                  return (
+                    <div key={group.section}>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.section}</p>
+                      {privateItems.length ? (
+                        <div className="mb-3">
+                          <p className="mb-2 text-xs font-semibold text-slate-500">Private</p>
+                          <ul className="grid gap-2">
+                            {privateItems.map(renderItem)}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {sharedItems.length ? (
+                        <div>
+                          <p className="mb-2 text-xs font-semibold text-slate-500">Shared dorm</p>
+                          <ul className="grid gap-2">
+                            {sharedItems.map(renderItem)}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {checkinsLoading ? 'Loading checkins...' : 'No checkins to process.'}
+              </p>
+            )}
+
+            <Button
+              className="mt-4"
+              disabled={!visibleCheckins.length || checkinsLoading}
+              onClick={() => void applyCheckins()}
+            >
+              Apply check-ins
+            </Button>
+          </Panel>
+        ) : null}
+
+        {visibleCheckouts.length || checkoutsLoading || checkoutsError ? (
+          <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Checkout rooms</h3>
+              <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
+                {checkoutsLoading ? 'Loading...' : 'Refresh'}
+              </Button>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
+            </p>
+
+            {checkoutsError ? (
+              <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                checkoutsError.includes('Spinal')
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}>
+                {checkoutsError}
+              </div>
+            ) : null}
+
+            {visibleCheckouts.length ? (
+              <div className="mt-4 grid gap-4">
+                {checkoutGroups.map((group) => {
+                  const privateItems = group.items.filter((checkout) => {
+                    const room = cleaningRooms.find((item) => item.code === String(checkout.room))
+                    return room?.roomType === 'private'
+                  })
+                  const sharedItems = group.items.filter((checkout) => {
+                    const room = cleaningRooms.find((item) => item.code === String(checkout.room))
+                    return room?.roomType !== 'private'
+                  })
+
+                  const renderItem = (checkout: (typeof group.items)[number]) => (
+                    <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink">Room {checkout.room}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Remove checkout"
+                        onClick={() => {
+                          if (!window.confirm('This checkout will not be shown again today. Continue?')) return
+                          const key = `${checkout.room}-${checkout.name}`
+                          setDismissedCheckouts((current) => {
+                            const next = new Set([...current, key])
+                            writeDismissedCheckouts(checkoutDate(), next)
+                            return next
+                          })
+                          setCheckouts((current) =>
+                            current.filter(
+                              (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
+                            ),
+                          )
+                        }}
+                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <X size={16} />
+                      </button>
+                    </li>
+                  )
+
+                  return (
+                    <div key={group.section}>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.section}</p>
+                      {privateItems.length ? (
+                        <div className="mb-3">
+                          <p className="mb-2 text-xs font-semibold text-slate-500">Private</p>
+                          <ul className="grid gap-2">
+                            {privateItems.map(renderItem)}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {sharedItems.length ? (
+                        <div>
+                          <p className="mb-2 text-xs font-semibold text-slate-500">Shared dorm</p>
+                          <ul className="grid gap-2">
+                            {sharedItems.map(renderItem)}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {checkoutsLoading ? 'Loading checkouts...' : 'No checkouts to process.'}
+              </p>
+            )}
+
+            <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={checkoutSendMessenger}
+                onChange={(event) => setCheckoutSendMessenger(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium">Send Messenger update now</span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  If unchecked, these rooms stay in the pending Messenger list.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
 
-          <Button
-            className="mt-4"
-            disabled={!visibleCheckouts.length || checkoutsLoading}
-            onClick={() => void applyCheckouts()}
-          >
-            Apply checkouts
-          </Button>
-        </Panel>
+            <Button
+              className="mt-4"
+              disabled={!visibleCheckouts.length || checkoutsLoading}
+              onClick={() => void applyCheckouts()}
+            >
+              Apply checkouts
+            </Button>
+          </Panel>
         ) : null}
 
         {pendingMessengerKeys.length ? (
-          <Panel className="p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Pending Messenger updates</h3>
-              <span className="text-sm text-slate-500">{pendingMessengerKeys.length} unsent</span>
-            </div>
-            <p className="mt-2 text-sm text-slate-500">
-              These rooms or places are marked as needing cleaning but have not been sent to Messenger yet.
-            </p>
-            <div className="mt-4 grid gap-4">
-              {pendingMessengerGroups.map(([section, keys]) => (
-                <div key={section}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{section}</p>
-                  <ul className="grid gap-2">
-                    {keys.map((key) => (
-                      <li key={key} className="relative flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                        <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            aria-label="Pending update actions"
-                            onClick={() => setPendingMenuKey((current) => (current === key ? null : key))}
-                            className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                          {pendingMenuKey === key ? (
-                            <>
-                              <button
-                                type="button"
-                                aria-label="Close actions menu"
-                                className="fixed inset-0 z-10 cursor-default"
-                                onClick={() => setPendingMenuKey(null)}
-                              />
-                              <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
-                                <button
-                                  type="button"
-                                  onClick={() => openAssignPending(key)}
-                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
-                                >
-                                  <UserRound size={16} className="text-slate-500" />
-                                  Assign cleaner
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPendingMenuKey(null)
-                                    setSentMessengerKeys((current) => [...new Set([...current, key])])
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
-                                >
-                                  <X size={16} />
-                                  Remove from pending
-                                </button>
-                              </div>
-                            </>
-                          ) : null}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <Button
-              className="mt-4"
-              disabled={sendingMessenger || !isMessengerConfigured()}
-              onClick={() => void sendPendingMessenger()}
-            >
-              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
-            </Button>
-          </Panel>
+          <button
+            type="button"
+            onClick={() => setPendingMessengerModalOpen(true)}
+            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-teal/40 hover:bg-teal/5"
+          >
+            <span className="font-semibold text-ink">Pending Messenger updates</span>
+            <span className="rounded-full bg-teal px-3 py-1 text-xs font-semibold text-white">
+              {pendingMessengerKeys.length}
+            </span>
+          </button>
         ) : null}
 
       </div>
@@ -1118,6 +1287,82 @@ export const AdminCleaningTasksPage = () => {
             >
               {assignPendingBusy ? 'Assigning...' : 'Assign'}
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={pendingMessengerModalOpen}
+        onClose={() => setPendingMessengerModalOpen(false)}
+        title="Pending Messenger updates"
+        description="Rooms or places marked as needing cleaning but not sent to Messenger yet."
+        panelClassName="max-w-2xl"
+      >
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-500">{pendingMessengerKeys.length} unsent</span>
+            <Button
+              disabled={sendingMessenger || !isMessengerConfigured()}
+              onClick={() => void sendPendingMessenger()}
+            >
+              {sendingMessenger ? 'Sending...' : 'Send pending to Messenger'}
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {pendingMessengerGroups.map(([section, keys]) => (
+              <div key={section}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{section}</p>
+                <ul className="grid gap-2">
+                  {keys.map((key) => (
+                    <li key={key} className="relative flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                      <span>{key.startsWith('room:') ? `Room ${key.slice(5)}` : key.slice(7)}</span>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          aria-label="Pending update actions"
+                          onClick={() => setPendingMenuKey((current) => (current === key ? null : key))}
+                          className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {pendingMenuKey === key ? (
+                          <>
+                            <button
+                              type="button"
+                              aria-label="Close actions menu"
+                              className="fixed inset-0 z-10 cursor-default"
+                              onClick={() => setPendingMenuKey(null)}
+                            />
+                            <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={() => openAssignPending(key)}
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                              >
+                                <UserRound size={16} className="text-slate-500" />
+                                Assign cleaner
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPendingMenuKey(null)
+                                  setSentMessengerKeys((current) => [...new Set([...current, key])])
+                                }}
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                              >
+                                <X size={16} />
+                                Remove from pending
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       </Modal>
