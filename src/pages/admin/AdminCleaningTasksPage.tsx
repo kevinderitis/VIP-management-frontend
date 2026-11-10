@@ -320,7 +320,14 @@ export const AdminCleaningTasksPage = () => {
     }
 
     return [...groups.entries()]
-      .sort((left, right) => left[0].localeCompare(right[0]))
+      .sort((left, right) => {
+        const leftRank = sectionOrder.indexOf(left[0])
+        const rightRank = sectionOrder.indexOf(right[0])
+        const normalizedLeftRank = leftRank === -1 ? sectionOrder.length : leftRank
+        const normalizedRightRank = rightRank === -1 ? sectionOrder.length : rightRank
+        if (normalizedLeftRank !== normalizedRightRank) return normalizedLeftRank - normalizedRightRank
+        return left[0].localeCompare(right[0])
+      })
       .map(([section, items]) => ({
         section,
         items: [...items].sort((left, right) => {
@@ -363,7 +370,15 @@ export const AdminCleaningTasksPage = () => {
       if (!groups.has(section)) groups.set(section, [])
       groups.get(section)!.push(key)
     }
-    return [...groups.entries()].sort((left, right) => left[0].localeCompare(right[0]))
+    return [...groups.entries()]
+      .sort((left, right) => {
+        const leftRank = sectionOrder.indexOf(left[0])
+        const rightRank = sectionOrder.indexOf(right[0])
+        const normalizedLeftRank = leftRank === -1 ? sectionOrder.length : leftRank
+        const normalizedRightRank = rightRank === -1 ? sectionOrder.length : rightRank
+        if (normalizedLeftRank !== normalizedRightRank) return normalizedLeftRank - normalizedRightRank
+        return left[0].localeCompare(right[0])
+      })
   }, [cleaningRooms, pendingMessengerKeys])
 
   const findCleaningTaskForKey = (key: string) => {
