@@ -857,44 +857,70 @@ export const AdminCleaningTasksPage = () => {
 
           {visibleCheckouts.length ? (
             <div className="mt-4 grid gap-4">
-              {checkoutGroups.map((group) => (
-                <div key={group.section}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.section}</p>
-                  <ul className="grid gap-2">
-                    {group.items.map((checkout) => (
-                      <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-ink">Room {checkout.room}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          aria-label="Remove checkout"
-                          onClick={() => {
-                            if (!window.confirm('This checkout will not be shown again today. Continue?')) return
-                            const key = `${checkout.room}-${checkout.name}`
-                            setDismissedCheckouts((current) => {
-                              const next = new Set([...current, key])
-                              writeDismissedCheckouts(checkoutDate(), next)
-                              return next
-                            })
-                            setCheckouts((current) =>
-                              current.filter(
-                                (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
-                              ),
-                            )
-                          }}
-                          className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                        >
-                          <X size={16} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              {checkoutGroups.map((group) => {
+                const privateItems = group.items.filter((checkout) => {
+                  const room = cleaningRooms.find((item) => item.code === String(checkout.room))
+                  return room?.roomType === 'private'
+                })
+                const sharedItems = group.items.filter((checkout) => {
+                  const room = cleaningRooms.find((item) => item.code === String(checkout.room))
+                  return room?.roomType !== 'private'
+                })
+
+                const renderItem = (checkout: (typeof group.items)[number]) => (
+                  <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">Room {checkout.room}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Remove checkout"
+                      onClick={() => {
+                        if (!window.confirm('This checkout will not be shown again today. Continue?')) return
+                        const key = `${checkout.room}-${checkout.name}`
+                        setDismissedCheckouts((current) => {
+                          const next = new Set([...current, key])
+                          writeDismissedCheckouts(checkoutDate(), next)
+                          return next
+                        })
+                        setCheckouts((current) =>
+                          current.filter(
+                            (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
+                          ),
+                        )
+                      }}
+                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </li>
+                )
+
+                return (
+                  <div key={group.section}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{group.section}</p>
+                    {privateItems.length ? (
+                      <div className="mb-3">
+                        <p className="mb-2 text-xs font-semibold text-slate-500">Private</p>
+                        <ul className="grid gap-2">
+                          {privateItems.map(renderItem)}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {sharedItems.length ? (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold text-slate-500">Shared dorm</p>
+                        <ul className="grid gap-2">
+                          {sharedItems.map(renderItem)}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p className="mt-4 text-sm text-slate-500">
