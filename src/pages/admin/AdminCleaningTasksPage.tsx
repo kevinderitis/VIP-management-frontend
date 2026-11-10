@@ -207,7 +207,7 @@ export const AdminCleaningTasksPage = () => {
       const loaded = Array.isArray(data.checkouts) ? data.checkouts : []
       const dismissed = readDismissedCheckouts(date)
       setDismissedCheckouts(dismissed)
-      ;(window as any).__checkoutDate = date
+      ;(window as { __checkoutDate?: string }).__checkoutDate = date
       setCheckouts(
         loaded.filter((checkout: { name?: string }) => {
           const name = String(checkout?.name ?? '').toLowerCase()
@@ -254,7 +254,7 @@ export const AdminCleaningTasksPage = () => {
       } catch {
         setDismissedCheckins(new Set<string>())
       }
-      ;(window as any).__checkinDate = date
+      ;(window as { __checkinDate?: string }).__checkinDate = date
       setCheckins(
         loaded.filter((checkin: { name?: string }) => {
           const name = String(checkin?.name ?? '').toLowerCase()
@@ -277,9 +277,9 @@ export const AdminCleaningTasksPage = () => {
     }
   }
 
-  const checkinDate = () => String((window as any).__checkinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+  const checkinDate = () => String((window as { __checkinDate?: string }).__checkinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
-  const checkoutDate = () => String((window as any).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+  const checkoutDate = () => String((window as { __checkoutDate?: string }).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
   useEffect(() => {
     void loadCheckouts()
@@ -289,6 +289,7 @@ export const AdminCleaningTasksPage = () => {
       void loadCheckins()
     }, 10 * 60 * 1000)
     return () => window.clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [pendingMenuKey, setPendingMenuKey] = useState<string | null>(null)
   const [pendingMessengerModalOpen, setPendingMessengerModalOpen] = useState(false)
