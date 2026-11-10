@@ -166,6 +166,7 @@ export const AdminCleaningTasksPage = () => {
   const [checkinsLoading, setCheckinsLoading] = useState(false)
   const [checkinsError, setCheckinsError] = useState<string | null>(null)
   const [dismissedCheckins, setDismissedCheckins] = useState<Set<string>>(new Set())
+  const [checkinMenuKey, setCheckinMenuKey] = useState<string | null>(null)
   const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
   const dismissedStorageKey = (date: string) => `dismissed-checkouts-${date}`
@@ -970,10 +971,23 @@ export const AdminCleaningTasksPage = () => {
           />
         ) : null}
 
+        {pendingMessengerKeys.length ? (
+          <button
+            type="button"
+            onClick={() => setPendingMessengerModalOpen(true)}
+            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-teal/40 hover:bg-teal/5"
+          >
+            <span className="font-semibold text-ink">Pending Messenger updates</span>
+            <span className="rounded-full bg-teal px-3 py-1 text-xs font-semibold text-white">
+              {pendingMessengerKeys.length}
+            </span>
+          </button>
+        ) : null}
+
         {visibleCheckins.length || checkinsLoading || checkinsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Check-in rooms</h3>
+              <h3 className="section-title">Pending check-in</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
                 {checkinsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1012,31 +1026,82 @@ export const AdminCleaningTasksPage = () => {
                           {checkin.name}{checkin.comments ? ` · ${checkin.comments}` : ''}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        aria-label="Remove checkin"
-                        onClick={() => {
-                          if (!window.confirm('This check-in will not be shown again today. Continue?')) return
-                          const key = `${checkin.room}-${checkin.name}`
-                          setDismissedCheckins((current) => {
-                            const next = new Set([...current, key])
-                            try {
-                              window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...next]))
-                            } catch {
-                              // Ignore storage failures.
-                            }
-                            return next
-                          })
-                          setCheckins((current) =>
-                            current.filter(
-                              (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
-                            ),
-                          )
-                        }}
-                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                      >
-                        <X size={16} />
-                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          aria-label="Check-in actions"
+                          onClick={() => setCheckinMenuKey((current) => (current === `${checkin.room}-${checkin.name}` ? null : `${checkin.room}-${checkin.name}`))}
+                          className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {checkinMenuKey === `${checkin.room}-${checkin.name}` ? (
+                          <>
+                            <button
+                              type="button"
+                              aria-label="Close actions menu"
+                              className="fixed inset-0 z-10 cursor-default"
+                              onClick={() => setCheckinMenuKey(null)}
+                            />
+                            <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setCheckinMenuKey(null)
+                                  await bulkUpdateRoomCleaningStatus({
+                                    roomCodes: [String(checkin.room)],
+                                    label: 'Occupied',
+                                    color: '#3b82f6',
+                                  })
+                                  const key = `${checkin.room}-${checkin.name}`
+                                  setDismissedCheckins((current) => {
+                                    const next = new Set([...current, key])
+                                    try {
+                                      window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...next]))
+                                    } catch {
+                                      // Ignore storage failures.
+                                    }
+                                    return next
+                                  })
+                                  setCheckins((current) =>
+                                    current.filter(
+                                      (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                                    ),
+                                  )
+                                }}
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                              >
+                                Apply check-in
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!window.confirm('This check-in will not be shown again today. Continue?')) return
+                                  setCheckinMenuKey(null)
+                                  const key = `${checkin.room}-${checkin.name}`
+                                  setDismissedCheckins((current) => {
+                                    const next = new Set([...current, key])
+                                    try {
+                                      window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...next]))
+                                    } catch {
+                                      // Ignore storage failures.
+                                    }
+                                    return next
+                                  })
+                                  setCheckins((current) =>
+                                    current.filter(
+                                      (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                                    ),
+                                  )
+                                }}
+                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                              >
+                                Cancel for today
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
                     </li>
                   )
 
@@ -1199,18 +1264,6 @@ export const AdminCleaningTasksPage = () => {
           </Panel>
         ) : null}
 
-        {pendingMessengerKeys.length ? (
-          <button
-            type="button"
-            onClick={() => setPendingMessengerModalOpen(true)}
-            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-teal/40 hover:bg-teal/5"
-          >
-            <span className="font-semibold text-ink">Pending Messenger updates</span>
-            <span className="rounded-full bg-teal px-3 py-1 text-xs font-semibold text-white">
-              {pendingMessengerKeys.length}
-            </span>
-          </button>
-        ) : null}
 
       </div>
 
