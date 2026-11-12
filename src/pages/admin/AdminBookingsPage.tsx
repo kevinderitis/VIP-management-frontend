@@ -110,6 +110,8 @@ export const AdminBookingsPage = () => {
     return result
   }, [fromDate, toDate])
 
+  const today = new Date().toISOString().slice(0, 10)
+
   const grouped = useMemo(() => {
     const groups = new Map<string, Map<string, Booking[]>>()
     for (const booking of bookings) {
@@ -183,7 +185,9 @@ export const AdminBookingsPage = () => {
                 {days.map((day) => (
                   <div
                     key={day}
-                    className="flex w-[34px] shrink-0 items-center justify-center border-l border-slate-100 py-2 text-[10px] font-medium text-slate-500"
+                    className={`flex w-[34px] shrink-0 items-center justify-center border-l py-2 text-[10px] font-medium ${
+                      day === today ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-100 text-slate-500'
+                    }`}
                   >
                     {day.slice(8, 10)}
                   </div>
@@ -216,6 +220,15 @@ export const AdminBookingsPage = () => {
                               Bed {bed}
                             </div>
                             <div className="relative h-10 flex-1 overflow-hidden rounded-xl bg-white" style={{ width: days.length * dayWidth }}>
+                              {days.map((day, index) => (
+                                <div
+                                  key={day}
+                                  className={`absolute top-0 bottom-0 border-l ${
+                                    day === today ? 'border-amber-300 bg-amber-100/60' : 'border-slate-100'
+                                  }`}
+                                  style={{ left: index * dayWidth, width: dayWidth }}
+                                />
+                              ))}
                               {bedBookings.map((booking) => {
                                 const startOffset = dayDiff(fromDate, toDateKey(booking.startDate))
                                 const duration = Math.max(1, dayDiff(toDateKey(booking.startDate), toDateKey(booking.endDate)) + 1)
