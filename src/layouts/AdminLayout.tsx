@@ -14,6 +14,7 @@ const navItems = [
   { to: '/admin/standard-tasks', label: 'Recurring Tasks', icon: Repeat2 },
   { to: '/admin/assignments', label: 'Assignments', icon: CalendarRange },
   { to: '/admin/check-in', label: 'Check-in', icon: QrCode },
+  { to: '/admin/bookings', label: 'Bookings', icon: CalendarRange },
   { to: '/admin/tm30', label: 'TM30', icon: FileSpreadsheet },
   { to: '/admin/rewards', label: 'Rewards', icon: Gift },
 ]
