@@ -275,7 +275,8 @@ export const AdminBookingsPage = () => {
                     return aStart <= bEnd && bStart <= aEnd
                   }
 
-                  const bookingBedMap = new Map<Booking, number>()
+                  const bookingBedMap = new Map<string, number>()
+                  const bookingKey = (booking: Booking) => `${booking.name}-${booking.startDate}-${booking.endDate}`
                   const sortedBookings = [...roomBookings].sort((a, b) =>
                     parseDate(toDateKey(a.startDate)).getTime() - parseDate(toDateKey(b.startDate)).getTime(),
                   )
@@ -283,9 +284,9 @@ export const AdminBookingsPage = () => {
                     const usedBeds = new Set(
                       sortedBookings
                         .filter((other) => other !== booking && overlaps(other, booking))
-                        .map((other) => bookingBedMap.get(other) ?? 0),
+                        .map((other) => bookingBedMap.get(bookingKey(other)) ?? 0),
                     )
-                    bookingBedMap.set(booking, bedNumberFor(booking, usedBeds))
+                    bookingBedMap.set(bookingKey(booking), bedNumberFor(booking, usedBeds))
                   }
 
                   const isExpanded = expandedRooms.has(room)
@@ -313,7 +314,7 @@ export const AdminBookingsPage = () => {
                       {isExpanded ? (
                         <div className="mt-3">
                           {bedNumbers.map((bed) => {
-                            const bedBookings = roomBookings.filter((booking) => bookingBedMap.get(booking) === bed)
+                            const bedBookings = roomBookings.filter((booking) => bookingBedMap.get(bookingKey(booking)) === bed)
                             return (
                               <div key={bed} className="mb-2 flex items-center gap-3">
                                 <div className="w-20 shrink-0 text-xs font-semibold text-slate-500">
@@ -337,7 +338,7 @@ export const AdminBookingsPage = () => {
                                     if (left > days.length * dayWidth) return null
                                     return (
                                       <div
-                                        key={`${booking.name}-${booking.startDate}-${booking.endDate}-${bed}`}
+                                        key={`${bookingKey(booking)}-${bed}`}
                                         className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl border border-white/40 px-2 text-xs font-semibold text-white shadow-soft"
                                         style={{
                                           left,
