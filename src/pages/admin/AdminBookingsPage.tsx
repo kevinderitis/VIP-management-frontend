@@ -197,7 +197,7 @@ export const AdminBookingsPage = () => {
           </div>
         ) : null}
 
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 max-h-[75vh] overflow-auto">
           <div className="min-w-max">
             <div className="sticky top-0 z-10 bg-white">
               <div className="flex border-b border-slate-200">
@@ -327,7 +327,7 @@ export const AdminBookingsPage = () => {
                           {bedNumbers.map((bed) => {
                             const bedBookings = roomBookings.filter((booking) => bookingBedMap.get(bookingKey(booking)) === bed)
                             return (
-                              <div key={bed} className="mb-2 flex items-center gap-3">
+                              <div key={bed} className="mb-2 flex items-center gap-0">
                                 <div className="w-44 shrink-0 text-xs font-semibold text-slate-500">
                                   Bed {bed}
                                 </div>
