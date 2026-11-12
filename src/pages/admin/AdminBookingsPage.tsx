@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarRange, RefreshCw } from 'lucide-react'
 import { Button } from '../../components/common/Button'
+import { Modal } from '../../components/common/Modal'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
 import { useAppStore } from '../../store/app-store'
@@ -59,6 +60,7 @@ export const AdminBookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
   const loadBookings = async () => {
     const token = import.meta.env.VITE_MESSENGER_API_TOKEN
@@ -112,6 +114,17 @@ export const AdminBookingsPage = () => {
   }, [fromDate, toDate])
 
   const today = new Date().toISOString().slice(0, 10)
+
+  const monthGroups = useMemo(() => {
+    const groups: { month: string; count: number }[] = []
+    for (const day of days) {
+      const month = parseDate(day).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+      const last = groups[groups.length - 1]
+      if (last && last.month === month) last.count += 1
+      else groups.push({ month, count: 1 })
+    }
+    return groups
+  }, [days])
 
   const grouped = useMemo(() => {
     const groups = new Map<string, Map<string, Booking[]>>()
@@ -178,21 +191,39 @@ export const AdminBookingsPage = () => {
 
         <div className="mt-6 overflow-x-auto">
           <div className="min-w-max">
-            <div className="flex border-b border-slate-200">
-              <div className="w-44 shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Room
+            <div className="sticky top-0 z-10 bg-white">
+              <div className="flex border-b border-slate-200">
+                <div className="w-44 shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Room
+                </div>
+                <div className="flex">
+                  {monthGroups.map((group) => (
+                    <div
+                      key={group.month}
+                      className="flex items-center justify-center border-l border-slate-200 bg-slate-50 py-1 text-[11px] font-semibold text-slate-600"
+                      style={{ width: group.count * dayWidth }}
+                    >
+                      {group.month}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex">
-                {days.map((day) => (
-                  <div
-                    key={day}
-                    className={`flex w-[34px] shrink-0 items-center justify-center border-l py-2 text-[10px] font-medium ${
-                      day === today ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-100 text-slate-500'
-                    }`}
-                  >
-                    {day.slice(8, 10)}
-                  </div>
-                ))}
+              <div className="flex border-b border-slate-200">
+                <div className="w-44 shrink-0 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Bed
+                </div>
+                <div className="flex">
+                  {days.map((day) => (
+                    <div
+                      key={day}
+                      className={`flex w-[34px] shrink-0 items-center justify-center border-l py-2 text-[10px] font-medium ${
+                        day === today ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {day.slice(8, 10)}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -298,6 +329,7 @@ export const AdminBookingsPage = () => {
                                           backgroundColor: stateColor(booking.state),
                                         }}
                                         title={`${booking.name} · ${toDateKey(booking.startDate)} to ${toDateKey(booking.endDate)} · ${stateLabel(booking.state)}`}
+                                        onDoubleClick={() => setSelectedBooking(booking)}
                                       >
                                         <span className="truncate">{booking.name}</span>
                                       </div>
@@ -321,6 +353,47 @@ export const AdminBookingsPage = () => {
           </div>
         </div>
       </Panel>
+
+      <Modal
+        open={Boolean(selectedBooking)}
+        onClose={() => setSelectedBooking(null)}
+        title={selectedBooking ? selectedBooking.name : 'Booking details'}
+        description={selectedBooking ? `${stateLabel(selectedBooking.state)} · Room ${selectedBooking.room}` : ''}
+        panelClassName="max-w-md"
+      >
+        {selectedBooking ? (
+          <div className="grid gap-3 text-sm text-slate-600">
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Guest</p>
+              <p className="mt-1 font-semibold text-ink">{selectedBooking.name}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Room</p>
+              <p className="mt-1 font-semibold text-ink">Room {selectedBooking.room}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Property</p>
+              <p className="mt-1 font-semibold text-ink">{selectedBooking.property || 'Unknown'}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Dates</p>
+              <p className="mt-1 font-semibold text-ink">
+                {toDateKey(selectedBooking.startDate)} to {toDateKey(selectedBooking.endDate)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Status</p>
+              <p className="mt-1 font-semibold text-ink">{stateLabel(selectedBooking.state)}</p>
+            </div>
+            {selectedBooking.comments ? (
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Comments</p>
+                <p className="mt-1 font-semibold text-ink">{selectedBooking.comments}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }
