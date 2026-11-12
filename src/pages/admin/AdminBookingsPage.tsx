@@ -51,10 +51,15 @@ const stateLabel = (state: number) => {
 export const AdminBookingsPage = () => {
   const cleaningRooms = useAppStore((state) => state.cleaningRooms)
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set())
-  const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [fromDate, setFromDate] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 1)
+    return date.toISOString().slice(0, 10)
+  })
   const [toDate, setToDate] = useState(() => {
     const date = new Date()
-    date.setDate(date.getDate() + 14)
+    date.setDate(date.getDate() - 1)
+    date.setMonth(date.getMonth() + 1)
     return date.toISOString().slice(0, 10)
   })
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -232,7 +237,18 @@ export const AdminBookingsPage = () => {
                 <p className="mb-2 text-sm font-semibold text-ink">{property}</p>
                 {[...rooms.entries()].map(([room, roomBookings]) => {
                   const cleaningRoom = cleaningRooms.find((item) => item.code === room)
-                  const bedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(1, cleaningRoom?.bedCount ?? 1)
+                  const maxConcurrent = roomBookings.reduce((max, booking) => {
+                    const count = roomBookings.filter((other) => {
+                      const aStart = parseDate(toDateKey(booking.startDate)).getTime()
+                      const aEnd = parseDate(toDateKey(booking.endDate)).getTime()
+                      const bStart = parseDate(toDateKey(other.startDate)).getTime()
+                      const bEnd = parseDate(toDateKey(other.endDate)).getTime()
+                      return aStart <= bEnd && bStart <= aEnd
+                    }).length
+                    return Math.max(max, count)
+                  }, 1)
+                  const baseBedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(1, cleaningRoom?.bedCount ?? 1)
+                  const bedCount = Math.max(baseBedCount, maxConcurrent)
                   const bedNumbers = Array.from({ length: bedCount }, (_, index) => index + 1)
 
                   const bedNumberFor = (booking: Booking, usedBeds: Set<number>) => {
@@ -322,7 +338,7 @@ export const AdminBookingsPage = () => {
                                     return (
                                       <div
                                         key={`${booking.name}-${booking.startDate}-${booking.endDate}-${bed}`}
-                                        className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl px-2 text-xs font-semibold text-white shadow-soft"
+                                        className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl border border-white/40 px-2 text-xs font-semibold text-white shadow-soft"
                                         style={{
                                           left,
                                           width: Math.max(24, width),
