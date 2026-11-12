@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarRange, RefreshCw } from 'lucide-react'
+import { Button } from '../../components/common/Button'
 import { Panel } from '../../components/common/Panel'
 import { SectionHeader } from '../../components/common/SectionHeader'
-import { Button } from '../../components/common/Button'
+import { useAppStore } from '../../store/app-store'
 
 type Booking = {
   name: string
@@ -11,6 +12,7 @@ type Booking = {
   room: string
   property: string | null
   type: string | null
+  bed: string | number | null
   startDate: string
   endDate: string
 }
@@ -46,6 +48,7 @@ const stateLabel = (state: number) => {
 }
 
 export const AdminBookingsPage = () => {
+  const cleaningRooms = useAppStore((state) => state.cleaningRooms)
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [toDate, setToDate] = useState(() => {
     const date = new Date()
@@ -191,36 +194,56 @@ export const AdminBookingsPage = () => {
             {grouped.map(([property, rooms]) => (
               <div key={property} className="mt-4">
                 <p className="mb-2 text-sm font-semibold text-ink">{property}</p>
-                {[...rooms.entries()].map(([room, roomBookings]) => (
-                  <div key={room} className="flex border-b border-slate-100">
-                    <div className="w-44 shrink-0 px-3 py-3 text-sm font-semibold text-ink">
-                      Room {room}
-                    </div>
-                    <div className="relative h-12 flex-1" style={{ width: days.length * dayWidth }}>
-                      {roomBookings.map((booking) => {
-                        const startOffset = dayDiff(fromDate, toDateKey(booking.startDate))
-                        const duration = Math.max(1, dayDiff(toDateKey(booking.startDate), toDateKey(booking.endDate)) + 1)
-                        const left = Math.max(0, startOffset) * dayWidth
-                        const width = duration * dayWidth - 4
-                        if (left > days.length * dayWidth) return null
+                {[...rooms.entries()].map(([room, roomBookings]) => {
+                  const cleaningRoom = cleaningRooms.find((item) => item.code === room)
+                  const bedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(1, cleaningRoom?.bedCount ?? 1)
+                  const bedNumbers = Array.from({ length: bedCount }, (_, index) => index + 1)
+
+                  const bedNumberFor = (booking: Booking) => {
+                    const parsed = Number.parseInt(String(booking.bed ?? ''), 10)
+                    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= bedCount) return parsed
+                    return 1
+                  }
+
+                  return (
+                    <div key={room} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="mb-2 text-sm font-semibold text-ink">Room {room}</p>
+                      {bedNumbers.map((bed) => {
+                        const bedBookings = roomBookings.filter((booking) => bedNumberFor(booking) === bed)
                         return (
-                          <div
-                            key={`${booking.name}-${booking.startDate}-${booking.endDate}`}
-                            className="absolute top-2 flex h-8 items-center overflow-hidden rounded-xl px-2 text-xs font-semibold text-white shadow-soft"
-                            style={{
-                              left,
-                              width: Math.max(24, width),
-                              backgroundColor: stateColor(booking.state),
-                            }}
-                            title={`${booking.name} · ${toDateKey(booking.startDate)} to ${toDateKey(booking.endDate)} · ${stateLabel(booking.state)}`}
-                          >
-                            <span className="truncate">{booking.name}</span>
+                          <div key={bed} className="mb-2 flex items-center gap-3">
+                            <div className="w-20 shrink-0 text-xs font-semibold text-slate-500">
+                              Bed {bed}
+                            </div>
+                            <div className="relative h-10 flex-1 overflow-hidden rounded-xl bg-white" style={{ width: days.length * dayWidth }}>
+                              {bedBookings.map((booking) => {
+                                const startOffset = dayDiff(fromDate, toDateKey(booking.startDate))
+                                const duration = Math.max(1, dayDiff(toDateKey(booking.startDate), toDateKey(booking.endDate)) + 1)
+                                const left = Math.max(0, startOffset) * dayWidth
+                                const width = duration * dayWidth - 4
+                                if (left > days.length * dayWidth) return null
+                                return (
+                                  <div
+                                    key={`${booking.name}-${booking.startDate}-${booking.endDate}-${bed}`}
+                                    className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl px-2 text-xs font-semibold text-white shadow-soft"
+                                    style={{
+                                      left,
+                                      width: Math.max(24, width),
+                                      backgroundColor: stateColor(booking.state),
+                                    }}
+                                    title={`${booking.name} · ${toDateKey(booking.startDate)} to ${toDateKey(booking.endDate)} · ${stateLabel(booking.state)}`}
+                                  >
+                                    <span className="truncate">{booking.name}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
                         )
                       })}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
 
