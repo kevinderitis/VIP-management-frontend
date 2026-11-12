@@ -255,7 +255,7 @@ export const AdminBookingsPage = () => {
                     return Math.max(max, count)
                   }, 1)
                   const baseBedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(1, cleaningRoom?.bedCount ?? 1)
-                  const bedCount = Math.max(baseBedCount, maxConcurrent)
+                  const bedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(baseBedCount, maxConcurrent)
                   const bedNumbers = Array.from({ length: bedCount }, (_, index) => index + 1)
 
                   const bedNumberFor = (booking: Booking, usedBeds: Set<number>) => {
@@ -296,20 +296,22 @@ export const AdminBookingsPage = () => {
                     bookingBedMap.set(bookingKey(booking), bedNumberFor(booking, usedBeds))
                   }
 
-                  const isExpanded = expandedRooms.has(room)
+                  const isPrivateRoom = cleaningRoom?.roomType === 'private'
+                  const isExpanded = isPrivateRoom || expandedRooms.has(room)
 
                   return (
                     <div key={room} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          if (isPrivateRoom) return
                           setExpandedRooms((current) => {
                             const next = new Set(current)
                             if (next.has(room)) next.delete(room)
                             else next.add(room)
                             return next
                           })
-                        }
+                        }}
                         className="flex w-full items-center justify-between text-left"
                       >
                         <span className="text-sm font-semibold text-ink">Room {room}</span>
