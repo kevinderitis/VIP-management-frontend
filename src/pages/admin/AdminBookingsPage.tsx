@@ -49,6 +49,7 @@ const stateLabel = (state: number) => {
 
 export const AdminBookingsPage = () => {
   const cleaningRooms = useAppStore((state) => state.cleaningRooms)
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set())
   const [fromDate, setFromDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [toDate, setToDate] = useState(() => {
     const date = new Date()
@@ -203,57 +204,111 @@ export const AdminBookingsPage = () => {
                   const bedCount = cleaningRoom?.roomType === 'private' ? 1 : Math.max(1, cleaningRoom?.bedCount ?? 1)
                   const bedNumbers = Array.from({ length: bedCount }, (_, index) => index + 1)
 
-                  const bedNumberFor = (booking: Booking) => {
-                    const parsed = Number.parseInt(String(booking.bed ?? ''), 10)
-                    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= bedCount) return parsed
+                  const bedNumberFor = (booking: Booking, usedBeds: Set<number>) => {
+                    const nameMatch = String(booking.name ?? '').match(/^(\d+)\s*[\/\-]/)
+                    if (nameMatch) {
+                      const parsed = Number.parseInt(nameMatch[1], 10)
+                      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= bedCount) return parsed
+                    }
+                    const explicit = Number.parseInt(String(booking.bed ?? ''), 10)
+                    if (!Number.isNaN(explicit) && explicit >= 1 && explicit <= bedCount && !usedBeds.has(explicit)) {
+                      return explicit
+                    }
+                    for (let bed = 1; bed <= bedCount; bed += 1) {
+                      if (!usedBeds.has(bed)) return bed
+                    }
                     return 1
                   }
 
+                  const overlaps = (a: Booking, b: Booking) => {
+                    const aStart = parseDate(toDateKey(a.startDate)).getTime()
+                    const aEnd = parseDate(toDateKey(a.endDate)).getTime()
+                    const bStart = parseDate(toDateKey(b.startDate)).getTime()
+                    const bEnd = parseDate(toDateKey(b.endDate)).getTime()
+                    return aStart <= bEnd && bStart <= aEnd
+                  }
+
+                  const bookingBedMap = new Map<Booking, number>()
+                  const sortedBookings = [...roomBookings].sort((a, b) =>
+                    parseDate(toDateKey(a.startDate)).getTime() - parseDate(toDateKey(b.startDate)).getTime(),
+                  )
+                  for (const booking of sortedBookings) {
+                    const usedBeds = new Set(
+                      sortedBookings
+                        .filter((other) => other !== booking && overlaps(other, booking))
+                        .map((other) => bookingBedMap.get(other) ?? 0),
+                    )
+                    bookingBedMap.set(booking, bedNumberFor(booking, usedBeds))
+                  }
+
+                  const isExpanded = expandedRooms.has(room)
+
                   return (
                     <div key={room} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <p className="mb-2 text-sm font-semibold text-ink">Room {room}</p>
-                      {bedNumbers.map((bed) => {
-                        const bedBookings = roomBookings.filter((booking) => bedNumberFor(booking) === bed)
-                        return (
-                          <div key={bed} className="mb-2 flex items-center gap-3">
-                            <div className="w-20 shrink-0 text-xs font-semibold text-slate-500">
-                              Bed {bed}
-                            </div>
-                            <div className="relative h-10 flex-1 overflow-hidden rounded-xl bg-white" style={{ width: days.length * dayWidth }}>
-                              {days.map((day, index) => (
-                                <div
-                                  key={day}
-                                  className={`absolute top-0 bottom-0 border-l ${
-                                    day === today ? 'border-amber-300 bg-amber-100/60' : 'border-slate-100'
-                                  }`}
-                                  style={{ left: index * dayWidth, width: dayWidth }}
-                                />
-                              ))}
-                              {bedBookings.map((booking) => {
-                                const startOffset = dayDiff(fromDate, toDateKey(booking.startDate))
-                                const duration = Math.max(1, dayDiff(toDateKey(booking.startDate), toDateKey(booking.endDate)) + 1)
-                                const left = Math.max(0, startOffset) * dayWidth
-                                const width = duration * dayWidth - 4
-                                if (left > days.length * dayWidth) return null
-                                return (
-                                  <div
-                                    key={`${booking.name}-${booking.startDate}-${booking.endDate}-${bed}`}
-                                    className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl px-2 text-xs font-semibold text-white shadow-soft"
-                                    style={{
-                                      left,
-                                      width: Math.max(24, width),
-                                      backgroundColor: stateColor(booking.state),
-                                    }}
-                                    title={`${booking.name} · ${toDateKey(booking.startDate)} to ${toDateKey(booking.endDate)} · ${stateLabel(booking.state)}`}
-                                  >
-                                    <span className="truncate">{booking.name}</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedRooms((current) => {
+                            const next = new Set(current)
+                            if (next.has(room)) next.delete(room)
+                            else next.add(room)
+                            return next
+                          })
+                        }
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <span className="text-sm font-semibold text-ink">Room {room}</span>
+                        <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">
+                          {roomBookings.length} guest{roomBookings.length === 1 ? '' : 's'} {isExpanded ? '▲' : '▼'}
+                        </span>
+                      </button>
+
+                      {isExpanded ? (
+                        <div className="mt-3">
+                          {bedNumbers.map((bed) => {
+                            const bedBookings = roomBookings.filter((booking) => bookingBedMap.get(booking) === bed)
+                            return (
+                              <div key={bed} className="mb-2 flex items-center gap-3">
+                                <div className="w-20 shrink-0 text-xs font-semibold text-slate-500">
+                                  Bed {bed}
+                                </div>
+                                <div className="relative h-10 flex-1 overflow-hidden rounded-xl bg-white" style={{ width: days.length * dayWidth }}>
+                                  {days.map((day, index) => (
+                                    <div
+                                      key={day}
+                                      className={`absolute top-0 bottom-0 border-l ${
+                                        day === today ? 'border-amber-300 bg-amber-100/60' : 'border-slate-100'
+                                      }`}
+                                      style={{ left: index * dayWidth, width: dayWidth }}
+                                    />
+                                  ))}
+                                  {bedBookings.map((booking) => {
+                                    const startOffset = dayDiff(fromDate, toDateKey(booking.startDate))
+                                    const duration = Math.max(1, dayDiff(toDateKey(booking.startDate), toDateKey(booking.endDate)) + 1)
+                                    const left = Math.max(0, startOffset) * dayWidth
+                                    const width = duration * dayWidth - 4
+                                    if (left > days.length * dayWidth) return null
+                                    return (
+                                      <div
+                                        key={`${booking.name}-${booking.startDate}-${booking.endDate}-${bed}`}
+                                        className="absolute top-1 flex h-8 items-center overflow-hidden rounded-xl px-2 text-xs font-semibold text-white shadow-soft"
+                                        style={{
+                                          left,
+                                          width: Math.max(24, width),
+                                          backgroundColor: stateColor(booking.state),
+                                        }}
+                                        title={`${booking.name} · ${toDateKey(booking.startDate)} to ${toDateKey(booking.endDate)} · ${stateLabel(booking.state)}`}
+                                      >
+                                        <span className="truncate">{booking.name}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}
