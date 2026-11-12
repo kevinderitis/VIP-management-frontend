@@ -66,6 +66,7 @@ export const AdminBookingsPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [hoveredDay, setHoveredDay] = useState<string | null>(null)
 
   const loadBookings = async () => {
     const token = import.meta.env.VITE_MESSENGER_API_TOKEN
@@ -221,8 +222,14 @@ export const AdminBookingsPage = () => {
                   {days.map((day) => (
                     <div
                       key={day}
+                      onMouseEnter={() => setHoveredDay(day)}
+                      onMouseLeave={() => setHoveredDay(null)}
                       className={`flex w-[34px] shrink-0 items-center justify-center border-l py-2 text-[10px] font-medium ${
-                        day === today ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-100 text-slate-500'
+                        day === today
+                          ? 'border-amber-300 bg-amber-100 text-amber-800'
+                          : hoveredDay === day
+                            ? 'border-teal bg-teal/10 text-teal'
+                            : 'border-slate-100 text-slate-500'
                       }`}
                     >
                       {day.slice(8, 10)}
@@ -324,8 +331,13 @@ export const AdminBookingsPage = () => {
                                   {days.map((day, index) => (
                                     <div
                                       key={day}
+                                      onMouseEnter={() => setHoveredDay(day)}
                                       className={`absolute top-0 bottom-0 border-l ${
-                                        day === today ? 'border-amber-300 bg-amber-100/60' : 'border-slate-100'
+                                        day === today
+                                          ? 'border-amber-300 bg-amber-100/60'
+                                          : hoveredDay === day
+                                            ? 'border-teal bg-teal/10'
+                                            : 'border-slate-100'
                                       }`}
                                       style={{ left: index * dayWidth, width: dayWidth }}
                                     />
