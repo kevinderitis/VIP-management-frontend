@@ -326,7 +326,7 @@ export const AdminBookingsPage = () => {
                             const bedBookings = roomBookings.filter((booking) => bookingBedMap.get(bookingKey(booking)) === bed)
                             return (
                               <div key={bed} className="mb-2 flex items-center gap-3">
-                                <div className="w-20 shrink-0 text-xs font-semibold text-slate-500">
+                                <div className="w-44 shrink-0 text-xs font-semibold text-slate-500">
                                   Bed {bed}
                                 </div>
                                 <div className="relative h-10 flex-1 overflow-hidden rounded-xl bg-white" style={{ width: days.length * dayWidth }}>
