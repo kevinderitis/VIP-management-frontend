@@ -136,7 +136,7 @@ export const AdminBookingsPage = () => {
     const groups = new Map<string, Map<string, Booking[]>>()
     for (const booking of bookings) {
       const roomCode = String(booking.room || '').trim()
-      if (!/^\\d+$/.test(roomCode)) continue
+      if (!/^\d+$/.test(roomCode)) continue
       const property = booking.property || 'Other'
       const room = roomCode
       if (!groups.has(property)) groups.set(property, new Map())
