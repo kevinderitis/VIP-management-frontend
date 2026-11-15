@@ -360,6 +360,7 @@ export const AdminCleaningTasksPage = () => {
   const visibleCheckouts = checkouts.filter((checkout) => {
     const name = String(checkout?.name ?? '').toLowerCase()
     if (!name || name.includes('not available')) return false
+    if (!/^\d+$/.test(String(checkout?.room ?? '').trim())) return false
     if (dismissedCheckouts.has(`${checkout.room}-${checkout.name}`)) return false
 
     const status = cleaningPlaceStatuses.find(
@@ -372,6 +373,7 @@ export const AdminCleaningTasksPage = () => {
   const visibleCheckins = checkins.filter((checkin) => {
     const name = String(checkin?.name ?? '').toLowerCase()
     if (!name || name.includes('not available')) return false
+    if (!/^\d+$/.test(String(checkin?.room ?? '').trim())) return false
     if (dismissedCheckins.has(`${checkin.room}-${checkin.name}`)) return false
     return true
   })
