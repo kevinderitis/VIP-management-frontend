@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { BedDouble, ChevronDown, Grid2X2, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
+import { BedDouble, CheckCircle2, ChevronDown, Grid2X2, LogIn, LogOut, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -1171,7 +1171,7 @@ export const AdminCleaningTasksPage = () => {
         {visibleCheckedIns.length || checkedInsLoading || checkedInsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Checked-in rooms</h3>
+              <h3 className="section-title flex items-center gap-2"><CheckCircle2 size={18} className="text-blue-500" />Checked-in rooms</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckedIns()} disabled={checkedInsLoading}>
                 {checkedInsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1304,7 +1304,7 @@ export const AdminCleaningTasksPage = () => {
         {visibleCheckins.length || checkinsLoading || checkinsError ? (
         <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Pending check-in</h3>
+              <h3 className="section-title flex items-center gap-2"><LogIn size={18} className="text-amber-500" />Pending check-in</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
                 {checkinsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1470,7 +1470,7 @@ export const AdminCleaningTasksPage = () => {
         {visibleCheckouts.length || checkoutsLoading || checkoutsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Checkout rooms</h3>
+              <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-emerald-600" />Checkout rooms</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
                 {checkoutsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1590,7 +1590,7 @@ export const AdminCleaningTasksPage = () => {
         {visiblePendingCheckouts.length || pendingCheckoutsLoading || pendingCheckoutsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title">Pending check-out</h3>
+              <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-slate-500" />Pending check-out</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadPendingCheckouts()} disabled={pendingCheckoutsLoading}>
                 {pendingCheckoutsLoading ? 'Loading...' : 'Refresh'}
               </Button>
