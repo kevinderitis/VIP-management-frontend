@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { BedDouble, CheckCircle2, ChevronDown, Grid2X2, LogIn, LogOut, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
+import { BedDouble, CheckCircle2, ChevronDown, Grid2X2, LogOut, MapPin, MoreVertical, Search, SprayCan, UserCog, UserRound, X } from 'lucide-react'
 import { BulkBedTaskModal } from '../../components/admin/BulkBedTaskModal'
 import { BulkRoomCleaningModal } from '../../components/admin/BulkRoomCleaningModal'
 import { CleanerActivityPanel } from '../../components/admin/CleanerActivityPanel'
@@ -1171,7 +1171,7 @@ export const AdminCleaningTasksPage = () => {
         {visibleCheckedIns.length || checkedInsLoading || checkedInsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title flex items-center gap-2"><CheckCircle2 size={18} className="text-blue-500" />Checked-in rooms</h3>
+              <h3 className="section-title flex items-center gap-2"><CheckCircle2 size={18} className="text-blue-500" />Check-ins</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckedIns()} disabled={checkedInsLoading}>
                 {checkedInsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1298,13 +1298,10 @@ export const AdminCleaningTasksPage = () => {
             >
               Apply checked-ins
             </Button>
-          </Panel>
-        ) : null}
-
-        {visibleCheckins.length || checkinsLoading || checkinsError ? (
-        <Panel className="p-6">
+          
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pending check-in</p>
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title flex items-center gap-2"><LogIn size={18} className="text-amber-500" />Pending check-in</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
                 {checkinsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1429,13 +1426,16 @@ export const AdminCleaningTasksPage = () => {
             >
               Apply check-ins
             </Button>
-          </Panel>
+          
+            </div>
+</Panel>
         ) : null}
+
 
         {visibleCheckouts.length || checkoutsLoading || checkoutsError ? (
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-emerald-600" />Checkout rooms</h3>
+              <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-emerald-600" />Check-outs</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
                 {checkoutsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1549,13 +1549,10 @@ export const AdminCleaningTasksPage = () => {
             >
               Apply checkouts
             </Button>
-          </Panel>
-        ) : null}
-
-        {visiblePendingCheckouts.length || pendingCheckoutsLoading || pendingCheckoutsError ? (
-          <Panel className="p-6">
+          
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pending check-out</p>
             <div className="flex items-center justify-between gap-4">
-              <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-slate-500" />Pending check-out</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadPendingCheckouts()} disabled={pendingCheckoutsLoading}>
                 {pendingCheckoutsLoading ? 'Loading...' : 'Refresh'}
               </Button>
@@ -1618,8 +1615,11 @@ export const AdminCleaningTasksPage = () => {
               </p>
             )}
 
-          </Panel>
+          
+            </div>
+</Panel>
         ) : null}
+
 
       </div>
 
