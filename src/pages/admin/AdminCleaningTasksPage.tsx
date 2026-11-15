@@ -392,14 +392,44 @@ export const AdminCleaningTasksPage = () => {
     if (hasCleanerActivity) setCleanerActivityOpen(true)
   }
 
-  const applyCheckedIns = async () => {
-    if (!visibleCheckedIns.length) return
-    const roomCodes = [...new Set(visibleCheckedIns.map((checkin) => String(checkin.room)))]
-    await bulkUpdateRoomCleaningStatus({
-      roomCodes,
+  const applyCheckedInRoom = async (checkin: { room: string | number; name: string }) => {
+    const room = cleaningRooms.find((item) => item.code === String(checkin.room))
+    const currentStatus = cleaningPlaceStatuses.find(
+      (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
+    )
+    await upsertCleaningPlaceStatus({
+      placeType: 'room',
+      roomCode: String(checkin.room),
+      roomSection: room?.section ?? currentStatus?.roomSection,
+      roomType: (room?.roomType === 'shared' ? 'shared' : 'private') as 'private' | 'shared',
+      placeLabel: room?.label ?? currentStatus?.placeLabel ?? `Room ${checkin.room}`,
       label: 'Occupied',
       color: '#3b82f6',
+      beds: currentStatus?.beds,
+      occupantName: checkin.name,
     })
+  }
+
+  const applyCheckedIns = async () => {
+    if (!visibleCheckedIns.length) return
+    const hasNeedsCleaning = visibleCheckedIns.some((checkin) => {
+      const status = cleaningPlaceStatuses.find(
+        (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
+      )
+      const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
+      return label === 'need cleaning' || label === 'needs cleaning'
+    })
+    if (hasNeedsCleaning) {
+      const confirmed = window.confirm(
+        'One or more rooms are currently marked as needing cleaning. Applying will set them to Occupied. Continue?',
+      )
+      if (!confirmed) return
+    }
+
+    for (const checkin of visibleCheckedIns) {
+      await applyCheckedInRoom(checkin)
+    }
+
     const dismissed = new Set([
       ...dismissedCheckedIns,
       ...visibleCheckedIns.map((checkin) => `${checkin.room}-${checkin.name}`),
@@ -423,6 +453,7 @@ export const AdminCleaningTasksPage = () => {
       sendMessenger: checkoutSendMessenger,
     })
     const keys = roomCodes.map((code) => `room:${code}`)
+    setSentMessengerKeys((current) => current.filter((key) => !keys.includes(key)))
     if (checkoutSendMessenger) {
       await sendPendingMessenger(keys)
     }
@@ -1211,11 +1242,17 @@ export const AdminCleaningTasksPage = () => {
                                 type="button"
                                 onClick={async () => {
                                   setCheckinMenuKey(null)
-                                  await bulkUpdateRoomCleaningStatus({
-                                    roomCodes: [String(checkin.room)],
-                                    label: 'Occupied',
-                                    color: '#3b82f6',
-                                  })
+                                  const status = cleaningPlaceStatuses.find(
+                                    (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
+                                  )
+                                  const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
+                                  if (label === 'need cleaning' || label === 'needs cleaning') {
+                                    const confirmed = window.confirm(
+                                      'This room is currently marked as needing cleaning. Applying will set it to Occupied. Continue?',
+                                    )
+                                    if (!confirmed) return
+                                  }
+                                  await applyCheckedInRoom(checkin)
                                   const key = `${checkin.room}-${checkin.name}`
                                   setDismissedCheckins((current) => {
                                     const next = new Set([...current, key])
@@ -1612,6 +1649,7 @@ export const AdminCleaningTasksPage = () => {
             void (async () => {
               await upsertCleaningPlaceStatus(input)
               if (needsCleaning) {
+                setSentMessengerKeys((current) => current.filter((item) => item !== key))
                 if (input.sendMessenger) {
                   await sendPendingMessenger([key])
                 }
@@ -1665,6 +1703,7 @@ export const AdminCleaningTasksPage = () => {
             const needsCleaning = ['need cleaning', 'needs cleaning'].includes(input.label.trim().toLowerCase())
             const key = `room:${input.roomCode}`
             if (needsCleaning) {
+              setSentMessengerKeys((current) => current.filter((item) => item !== key))
               if (input.sendMessenger) {
                 await sendPendingMessenger([key])
               }
@@ -1692,6 +1731,7 @@ export const AdminCleaningTasksPage = () => {
           const keys = input.roomCodes.map((code) => `room:${code}`)
           const needsCleaning = ['need cleaning', 'needs cleaning'].includes(input.label.trim().toLowerCase())
           if (needsCleaning) {
+            setSentMessengerKeys((current) => current.filter((key) => !keys.includes(key)))
             if (input.sendMessenger) {
               await sendPendingMessenger(keys)
             }
