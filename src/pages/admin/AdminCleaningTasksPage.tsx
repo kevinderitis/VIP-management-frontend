@@ -162,6 +162,11 @@ export const AdminCleaningTasksPage = () => {
   const [checkoutsError, setCheckoutsError] = useState<string | null>(null)
   const [checkoutSendMessenger, setCheckoutSendMessenger] = useState(false)
 
+  const [pendingCheckouts, setPendingCheckouts] = useState<Array<{ name: string; state: number; comments: string; room: string }>>([])
+  const [pendingCheckoutsLoading, setPendingCheckoutsLoading] = useState(false)
+  const [pendingCheckoutsError, setPendingCheckoutsError] = useState<string | null>(null)
+  const [dismissedPendingCheckouts, setDismissedPendingCheckouts] = useState<Set<string>>(new Set())
+
   const [checkins, setCheckins] = useState<Array<{ name: string; state: number; comments: string; room: string; property?: string | null; type?: string | null }>>([])
   const [checkinsLoading, setCheckinsLoading] = useState(false)
   const [checkinsError, setCheckinsError] = useState<string | null>(null)
@@ -334,16 +339,69 @@ export const AdminCleaningTasksPage = () => {
 
   const checkinDate = () => String((window as { __checkinDate?: string }).__checkinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
+  const loadPendingCheckouts = async () => {
+    const token = import.meta.env.VITE_MESSENGER_API_TOKEN
+    const apiUrl = import.meta.env.VITE_MESSENGER_API_URL
+    const url = apiUrl
+      ? apiUrl.replace('/api/messenger/send', '/api/hfsql/checkouts/external')
+      : 'http://localhost:3000/api/hfsql/checkouts/external'
+
+    setPendingCheckoutsLoading(true)
+    setPendingCheckoutsError(null)
+    try {
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      const loaded = Array.isArray(data.checkouts) ? data.checkouts : []
+      const date = String(data?.date ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+      try {
+        const raw = window.localStorage.getItem(`dismissed-pending-checkouts-${date}`)
+        const dismissed = raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set<string>()
+        setDismissedPendingCheckouts(dismissed)
+      } catch {
+        setDismissedPendingCheckouts(new Set<string>())
+      }
+      ;(window as { __pendingCheckoutDate?: string }).__pendingCheckoutDate = date
+      setPendingCheckouts(
+        loaded.filter((checkout: { name?: string; room?: string }) => {
+          const name = String(checkout?.name ?? '').toLowerCase()
+          if (!name || name.includes('not available')) return false
+          if (!/^\d+$/.test(String(checkout?.room ?? '').trim())) return false
+          return true
+        }),
+      )
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
+      setPendingCheckoutsError(
+        isNetworkError
+          ? 'Not connected to Spinal. Open HostelOps Service.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not load pending checkouts',
+      )
+    } finally {
+      setPendingCheckoutsLoading(false)
+    }
+  }
+
+  const pendingCheckoutDate = () => String((window as { __pendingCheckoutDate?: string }).__pendingCheckoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+
   const checkoutDate = () => String((window as { __checkoutDate?: string }).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
   useEffect(() => {
     void loadCheckouts()
     void loadCheckins()
     void loadCheckedIns()
+    void loadPendingCheckouts()
     const interval = window.setInterval(() => {
       void loadCheckouts()
       void loadCheckins()
       void loadCheckedIns()
+      void loadPendingCheckouts()
     }, 10 * 60 * 1000)
     return () => window.clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -465,6 +523,14 @@ export const AdminCleaningTasksPage = () => {
     writeDismissedCheckouts(checkoutDate(), dismissed)
     setCheckouts([])
   }
+  const visiblePendingCheckouts = pendingCheckouts.filter((checkout) => {
+    const name = String(checkout?.name ?? '').toLowerCase()
+    if (!name || name.includes('not available')) return false
+    if (!/^\d+$/.test(String(checkout?.room ?? '').trim())) return false
+    if (dismissedPendingCheckouts.has(`${checkout.room}-${checkout.name}`)) return false
+    return true
+  })
+
   const visibleCheckouts = checkouts.filter((checkout) => {
     const name = String(checkout?.name ?? '').toLowerCase()
     if (!name || name.includes('not available')) return false
@@ -1464,6 +1530,73 @@ export const AdminCleaningTasksPage = () => {
           </Panel>
         ) : null}
 
+        {visiblePendingCheckouts.length || pendingCheckoutsLoading || pendingCheckoutsError ? (
+          <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Pending check-out</h3>
+              <Button size="sm" variant="secondary" onClick={() => void loadPendingCheckouts()} disabled={pendingCheckoutsLoading}>
+                {pendingCheckoutsLoading ? 'Loading...' : 'Refresh'}
+              </Button>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Rooms that have checked out today. Review them as pending check-outs.
+            </p>
+
+            {pendingCheckoutsError ? (
+              <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                pendingCheckoutsError.includes('Spinal')
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}>
+                {pendingCheckoutsError}
+              </div>
+            ) : null}
+
+            {visiblePendingCheckouts.length ? (
+              <ul className="mt-4 grid gap-2">
+                {visiblePendingCheckouts.map((checkout) => (
+                  <li key={`${checkout.room}-${checkout.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">Room {checkout.room}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {checkout.name}{checkout.comments ? ` · ${checkout.comments}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Remove pending checkout"
+                      onClick={() => {
+                        if (!window.confirm('This check-out will not be shown again today. Continue?')) return
+                        const key = `${checkout.room}-${checkout.name}`
+                        setDismissedPendingCheckouts((current) => {
+                          const next = new Set([...current, key])
+                          try {
+                            window.localStorage.setItem(`dismissed-pending-checkouts-${pendingCheckoutDate()}`, JSON.stringify([...next]))
+                          } catch {
+                            // Ignore storage failures.
+                          }
+                          return next
+                        })
+                        setPendingCheckouts((current) =>
+                          current.filter(
+                            (item) => !(String(item.room) === String(checkout.room) && String(item.name) === String(checkout.name)),
+                          ),
+                        )
+                      }}
+                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {pendingCheckoutsLoading ? 'Loading pending check-outs...' : 'No pending check-outs to process.'}
+              </p>
+            )}
+          </Panel>
+        ) : null}
 
       </div>
 
