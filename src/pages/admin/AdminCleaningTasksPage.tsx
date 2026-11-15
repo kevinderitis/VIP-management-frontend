@@ -166,6 +166,11 @@ export const AdminCleaningTasksPage = () => {
   const [checkinsLoading, setCheckinsLoading] = useState(false)
   const [checkinsError, setCheckinsError] = useState<string | null>(null)
   const [dismissedCheckins, setDismissedCheckins] = useState<Set<string>>(new Set())
+
+  const [checkedIns, setCheckedIns] = useState<Array<{ name: string; state: number; comments: string; room: string; property?: string | null; type?: string | null }>>([])
+  const [checkedInsLoading, setCheckedInsLoading] = useState(false)
+  const [checkedInsError, setCheckedInsError] = useState<string | null>(null)
+  const [dismissedCheckedIns, setDismissedCheckedIns] = useState<Set<string>>(new Set())
   const [checkinMenuKey, setCheckinMenuKey] = useState<string | null>(null)
   const [dismissedCheckouts, setDismissedCheckouts] = useState<Set<string>>(new Set())
   const [sentMessengerKeys, setSentMessengerKeys] = useState<string[]>([])
@@ -278,6 +283,55 @@ export const AdminCleaningTasksPage = () => {
     }
   }
 
+  const loadCheckedIns = async () => {
+    const token = import.meta.env.VITE_MESSENGER_API_TOKEN
+    const apiUrl = import.meta.env.VITE_MESSENGER_API_URL
+    const url = apiUrl
+      ? apiUrl.replace('/api/messenger/send', '/api/hfsql/checkins/external')
+      : 'http://localhost:3000/api/hfsql/checkins/external'
+
+    setCheckedInsLoading(true)
+    setCheckedInsError(null)
+    try {
+      const response = await fetch(`${url}?state=2`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      const loaded = Array.isArray(data.checkins) ? data.checkins : []
+      const date = String(data?.date ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+      try {
+        const raw = window.localStorage.getItem(`dismissed-checkedins-${date}`)
+        const dismissed = raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set<string>()
+        setDismissedCheckedIns(dismissed)
+      } catch {
+        setDismissedCheckedIns(new Set<string>())
+      }
+      ;(window as { __checkedinDate?: string }).__checkedinDate = date
+      setCheckedIns(
+        loaded.filter((checkin: { name?: string }) => {
+          const name = String(checkin?.name ?? '').toLowerCase()
+          return name && !name.includes('not available')
+        }),
+      )
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
+      setCheckedInsError(
+        isNetworkError
+          ? 'Not connected to Spinal. Open HostelOps Service.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not load checked-ins',
+      )
+    } finally {
+      setCheckedInsLoading(false)
+    }
+  }
+
+  const checkedinDate = () => String((window as { __checkedinDate?: string }).__checkedinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
+
   const checkinDate = () => String((window as { __checkinDate?: string }).__checkinDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
 
   const checkoutDate = () => String((window as { __checkoutDate?: string }).__checkoutDate ?? new Date().toISOString().slice(0, 10).replace(/-/g, ''))
@@ -285,9 +339,11 @@ export const AdminCleaningTasksPage = () => {
   useEffect(() => {
     void loadCheckouts()
     void loadCheckins()
+    void loadCheckedIns()
     const interval = window.setInterval(() => {
       void loadCheckouts()
       void loadCheckins()
+      void loadCheckedIns()
     }, 10 * 60 * 1000)
     return () => window.clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -336,6 +392,27 @@ export const AdminCleaningTasksPage = () => {
     if (hasCleanerActivity) setCleanerActivityOpen(true)
   }
 
+  const applyCheckedIns = async () => {
+    if (!visibleCheckedIns.length) return
+    const roomCodes = [...new Set(visibleCheckedIns.map((checkin) => String(checkin.room)))]
+    await bulkUpdateRoomCleaningStatus({
+      roomCodes,
+      label: 'Occupied',
+      color: '#3b82f6',
+    })
+    const dismissed = new Set([
+      ...dismissedCheckedIns,
+      ...visibleCheckedIns.map((checkin) => `${checkin.room}-${checkin.name}`),
+    ])
+    setDismissedCheckedIns(dismissed)
+    try {
+      window.localStorage.setItem(`dismissed-checkedins-${checkedinDate()}`, JSON.stringify([...dismissed]))
+    } catch {
+      // Ignore storage failures.
+    }
+    setCheckedIns([])
+  }
+
   const applyCheckouts = async () => {
     if (!visibleCheckouts.length) return
     const roomCodes = [...new Set(visibleCheckouts.map((checkout) => String(checkout.room)))]
@@ -368,6 +445,14 @@ export const AdminCleaningTasksPage = () => {
     )
     const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
     return label === '' || label === 'clean' || label === 'occupied'
+  })
+
+  const visibleCheckedIns = checkedIns.filter((checkin) => {
+    const name = String(checkin?.name ?? '').toLowerCase()
+    if (!name || name.includes('not available')) return false
+    if (!/^\d+$/.test(String(checkin?.room ?? '').trim())) return false
+    if (dismissedCheckedIns.has(`${checkin.room}-${checkin.name}`)) return false
+    return true
   })
 
   const visibleCheckins = checkins.filter((checkin) => {
@@ -986,8 +1071,84 @@ export const AdminCleaningTasksPage = () => {
           </button>
         ) : null}
 
-        {visibleCheckins.length || checkinsLoading || checkinsError ? (
+        {visibleCheckedIns.length || checkedInsLoading || checkedInsError ? (
           <Panel className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="section-title">Checked-in rooms</h3>
+              <Button size="sm" variant="secondary" onClick={() => void loadCheckedIns()} disabled={checkedInsLoading}>
+                {checkedInsLoading ? 'Loading...' : 'Refresh'}
+              </Button>
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Rooms that have already checked in today. Apply them to update the system.
+            </p>
+
+            {checkedInsError ? (
+              <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                checkedInsError.includes('Spinal')
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}>
+                {checkedInsError}
+              </div>
+            ) : null}
+
+            {visibleCheckedIns.length ? (
+              <ul className="mt-4 grid gap-2">
+                {visibleCheckedIns.map((checkin) => (
+                  <li key={`${checkin.room}-${checkin.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-ink">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">Room {checkin.room}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {checkin.name}{checkin.comments ? ` · ${checkin.comments}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Remove checked-in room"
+                      onClick={() => {
+                        if (!window.confirm('This check-in will not be shown again today. Continue?')) return
+                        const key = `${checkin.room}-${checkin.name}`
+                        setDismissedCheckedIns((current) => {
+                          const next = new Set([...current, key])
+                          try {
+                            window.localStorage.setItem(`dismissed-checkedins-${checkedinDate()}`, JSON.stringify([...next]))
+                          } catch {
+                            // Ignore storage failures.
+                          }
+                          return next
+                        })
+                        setCheckedIns((current) =>
+                          current.filter(
+                            (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                          ),
+                        )
+                      }}
+                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                {checkedInsLoading ? 'Loading checked-ins...' : 'No checked-ins to process.'}
+              </p>
+            )}
+
+            <Button
+              className="mt-4"
+              disabled={!visibleCheckedIns.length || checkedInsLoading}
+              onClick={() => void applyCheckedIns()}
+            >
+              Apply checked-ins
+            </Button>
+          </Panel>
+        ) : null}
+
+        {visibleCheckins.length || checkinsLoading || checkinsError ? (
+        <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
               <h3 className="section-title">Pending check-in</h3>
               <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
