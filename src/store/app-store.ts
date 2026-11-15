@@ -385,6 +385,7 @@ const mapCleaningPlaceStatusInput = (input: CleaningPlaceStatusDraftInput) => ({
   assignCleanerId: input.assignCleanerId || undefined,
   assignVolunteerId: input.assignVolunteerId || undefined,
   applyVolunteerAssignment: input.applyVolunteerAssignment || undefined,
+  occupantName: input.occupantName || undefined,
 })
 
 const mapGroupInput = (input: TaskGroupDraftInput) => ({

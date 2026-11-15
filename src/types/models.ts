@@ -123,6 +123,7 @@ export interface CleaningPlaceStatus {
   roomServiceColor?: string
   trashRequested?: boolean
   beds: BedStatus[]
+  occupantName?: string
 }
 
 export interface ActiveStay {
@@ -384,6 +385,7 @@ export interface CleaningPlaceStatusDraftInput {
   assignVolunteerId?: string
   applyVolunteerAssignment?: boolean
   sendMessenger?: boolean
+  occupantName?: string
 }
 
 export interface RewardDraftInput {
