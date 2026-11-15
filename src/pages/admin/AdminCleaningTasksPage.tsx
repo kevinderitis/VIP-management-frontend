@@ -596,27 +596,6 @@ export const AdminCleaningTasksPage = () => {
       }))
   }, [cleaningRooms, visibleCheckins])
 
-  const applyCheckins = async () => {
-    if (!visibleCheckins.length) return
-    const roomCodes = [...new Set(visibleCheckins.map((checkin) => String(checkin.room)))]
-    await bulkUpdateRoomCleaningStatus({
-      roomCodes,
-      label: 'Occupied',
-      color: '#3b82f6',
-    })
-    const dismissed = new Set([
-      ...dismissedCheckins,
-      ...visibleCheckins.map((checkin) => `${checkin.room}-${checkin.name}`),
-    ])
-    setDismissedCheckins(dismissed)
-    try {
-      window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...dismissed]))
-    } catch {
-      // Ignore storage failures.
-    }
-    setCheckins([])
-  }
-
   const checkoutGroups = useMemo(() => {
     const groups = new Map<string, typeof visibleCheckouts>()
     for (const checkout of visibleCheckouts) {
@@ -1302,8 +1281,16 @@ export const AdminCleaningTasksPage = () => {
             <div className="mt-6 border-t border-slate-200 pt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pending check-in</p>
             <div className="flex items-center justify-between gap-4">
-              <Button size="sm" variant="secondary" onClick={() => void loadCheckins()} disabled={checkinsLoading}>
-                {checkinsLoading ? 'Loading...' : 'Refresh'}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void loadCheckins()
+                  void loadCheckedIns()
+                }}
+                disabled={checkinsLoading || checkedInsLoading}
+              >
+                {(checkinsLoading || checkedInsLoading) ? 'Loading...' : 'Refresh'}
               </Button>
             </div>
             <p className="mt-2 text-sm text-slate-500">
@@ -1419,14 +1406,6 @@ export const AdminCleaningTasksPage = () => {
               </p>
             )}
 
-            <Button
-              className="mt-4"
-              disabled={!visibleCheckins.length || checkinsLoading}
-              onClick={() => void applyCheckins()}
-            >
-              Apply check-ins
-            </Button>
-          
             </div>
 </Panel>
         ) : null}
@@ -1436,8 +1415,16 @@ export const AdminCleaningTasksPage = () => {
           <Panel className="p-6">
             <div className="flex items-center justify-between gap-4">
               <h3 className="section-title flex items-center gap-2"><LogOut size={18} className="text-emerald-600" />Check-outs</h3>
-              <Button size="sm" variant="secondary" onClick={() => void loadCheckouts()} disabled={checkoutsLoading}>
-                {checkoutsLoading ? 'Loading...' : 'Refresh'}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void loadCheckouts()
+                  void loadPendingCheckouts()
+                }}
+                disabled={checkoutsLoading || pendingCheckoutsLoading}
+              >
+                {(checkoutsLoading || pendingCheckoutsLoading) ? 'Loading...' : 'Refresh'}
               </Button>
             </div>
             <p className="mt-2 text-sm text-slate-500">
