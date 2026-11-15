@@ -349,7 +349,7 @@ export const AdminCleaningTasksPage = () => {
     setPendingCheckoutsLoading(true)
     setPendingCheckoutsError(null)
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${url}?state=2`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
