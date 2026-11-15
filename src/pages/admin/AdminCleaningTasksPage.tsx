@@ -1294,7 +1294,7 @@ export const AdminCleaningTasksPage = () => {
               </Button>
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Rooms that have checked in today. Apply them to mark the rooms as occupied.
+              Rooms that have checked in today.
             </p>
 
             {checkinsError ? (
@@ -1428,7 +1428,7 @@ export const AdminCleaningTasksPage = () => {
               </Button>
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Rooms that have checked out today. Apply them to mark the rooms as needing cleaning.
+              Rooms that have checked out today.
             </p>
 
             {checkoutsError ? (
@@ -1539,14 +1539,6 @@ export const AdminCleaningTasksPage = () => {
           
             <div className="mt-6 border-t border-slate-200 pt-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pending check-out</p>
-            <div className="flex items-center justify-between gap-4">
-              <Button size="sm" variant="secondary" onClick={() => void loadPendingCheckouts()} disabled={pendingCheckoutsLoading}>
-                {pendingCheckoutsLoading ? 'Loading...' : 'Refresh'}
-              </Button>
-            </div>
-            <p className="mt-2 text-sm text-slate-500">
-              Rooms that have checked out today. Review them as pending check-outs.
-            </p>
 
             {pendingCheckoutsError ? (
               <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
