@@ -166,7 +166,6 @@ export const AdminCleaningTasksPage = () => {
   const [pendingCheckoutsLoading, setPendingCheckoutsLoading] = useState(false)
   const [pendingCheckoutsError, setPendingCheckoutsError] = useState<string | null>(null)
   const [dismissedPendingCheckouts, setDismissedPendingCheckouts] = useState<Set<string>>(new Set())
-  const [pendingCheckoutSendMessenger, setPendingCheckoutSendMessenger] = useState(false)
 
   const [checkins, setCheckins] = useState<Array<{ name: string; state: number; comments: string; room: string; property?: string | null; type?: string | null }>>([])
   const [checkinsLoading, setCheckinsLoading] = useState(false)
@@ -500,46 +499,6 @@ export const AdminCleaningTasksPage = () => {
       // Ignore storage failures.
     }
     setCheckedIns([])
-  }
-
-  const applyPendingCheckoutRoom = async (checkout: { room: string | number; name: string }) => {
-    const room = cleaningRooms.find((item) => item.code === String(checkout.room))
-    const currentStatus = cleaningPlaceStatuses.find(
-      (entry) => entry.placeType === 'room' && entry.roomCode === String(checkout.room),
-    )
-    await upsertCleaningPlaceStatus({
-      placeType: 'room',
-      roomCode: String(checkout.room),
-      roomSection: room?.section ?? currentStatus?.roomSection,
-      roomType: (room?.roomType === 'shared' ? 'shared' : 'private') as 'private' | 'shared',
-      placeLabel: room?.label ?? currentStatus?.placeLabel ?? `Room ${checkout.room}`,
-      label: 'Needs cleaning',
-      color: '#ef4444',
-      beds: currentStatus?.beds,
-    })
-  }
-
-  const applyPendingCheckouts = async () => {
-    if (!visiblePendingCheckouts.length) return
-    for (const checkout of visiblePendingCheckouts) {
-      await applyPendingCheckoutRoom(checkout)
-    }
-    if (pendingCheckoutSendMessenger) {
-      const keys = [...new Set(visiblePendingCheckouts.map((checkout) => `room:${checkout.room}`))]
-      setSentMessengerKeys((current) => current.filter((key) => !keys.includes(key)))
-      await sendPendingMessenger(keys)
-    }
-    const dismissed = new Set([
-      ...dismissedPendingCheckouts,
-      ...visiblePendingCheckouts.map((checkout) => `${checkout.room}-${checkout.name}`),
-    ])
-    setDismissedPendingCheckouts(dismissed)
-    try {
-      window.localStorage.setItem(`dismissed-pending-checkouts-${pendingCheckoutDate()}`, JSON.stringify([...dismissed]))
-    } catch {
-      // Ignore storage failures.
-    }
-    setPendingCheckouts([])
   }
 
   const applyCheckouts = async () => {
@@ -1404,41 +1363,6 @@ export const AdminCleaningTasksPage = () => {
                             <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  setCheckinMenuKey(null)
-                                  const status = cleaningPlaceStatuses.find(
-                                    (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
-                                  )
-                                  const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
-                                  if (label === 'need cleaning' || label === 'needs cleaning') {
-                                    const confirmed = window.confirm(
-                                      'This room is currently marked as needing cleaning. Applying will set it to Occupied. Continue?',
-                                    )
-                                    if (!confirmed) return
-                                  }
-                                  await applyCheckedInRoom(checkin)
-                                  const key = `${checkin.room}-${checkin.name}`
-                                  setDismissedCheckins((current) => {
-                                    const next = new Set([...current, key])
-                                    try {
-                                      window.localStorage.setItem(`dismissed-checkins-${checkinDate()}`, JSON.stringify([...next]))
-                                    } catch {
-                                      // Ignore storage failures.
-                                    }
-                                    return next
-                                  })
-                                  setCheckins((current) =>
-                                    current.filter(
-                                      (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
-                                    ),
-                                  )
-                                }}
-                                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
-                              >
-                                Apply check-in
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => {
                                   if (!window.confirm('This check-in will not be shown again today. Continue?')) return
                                   setCheckinMenuKey(null)
@@ -1460,7 +1384,7 @@ export const AdminCleaningTasksPage = () => {
                                 }}
                                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
                               >
-                                Cancel for today
+                                Remove for today
                               </button>
                             </div>
                           </>
@@ -1694,28 +1618,6 @@ export const AdminCleaningTasksPage = () => {
               </p>
             )}
 
-              <label className="mt-4 flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={pendingCheckoutSendMessenger}
-                  onChange={(event) => setPendingCheckoutSendMessenger(event.target.checked)}
-                  className="mt-1"
-                />
-                <span>
-                  <span className="block font-medium">Send Messenger update now</span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    If unchecked, these rooms stay in the pending Messenger list.
-                  </span>
-                </span>
-              </label>
-
-              <Button
-                className="mt-4"
-                disabled={!visiblePendingCheckouts.length || pendingCheckoutsLoading}
-                onClick={() => void applyPendingCheckouts()}
-              >
-                Apply pending check-outs
-              </Button>
           </Panel>
         ) : null}
 
