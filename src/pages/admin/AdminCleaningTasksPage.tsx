@@ -1200,31 +1200,88 @@ export const AdminCleaningTasksPage = () => {
                         {checkin.name}{checkin.comments ? ` · ${checkin.comments}` : ''}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      aria-label="Remove checked-in room"
-                      onClick={() => {
-                        if (!window.confirm('This check-in will not be shown again today. Continue?')) return
-                        const key = `${checkin.room}-${checkin.name}`
-                        setDismissedCheckedIns((current) => {
-                          const next = new Set([...current, key])
-                          try {
-                            window.localStorage.setItem(`dismissed-checkedins-${checkedinDate()}`, JSON.stringify([...next]))
-                          } catch {
-                            // Ignore storage failures.
-                          }
-                          return next
-                        })
-                        setCheckedIns((current) =>
-                          current.filter(
-                            (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
-                          ),
-                        )
-                      }}
-                      className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                    >
-                      <X size={16} />
-                    </button>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        aria-label="Checked-in room actions"
+                        onClick={() => setCheckinMenuKey((current) => (current === `${checkin.room}-${checkin.name}` ? null : `${checkin.room}-${checkin.name}`))}
+                        className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {checkinMenuKey === `${checkin.room}-${checkin.name}` ? (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Close actions menu"
+                            className="fixed inset-0 z-10 cursor-default"
+                            onClick={() => setCheckinMenuKey(null)}
+                          />
+                          <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setCheckinMenuKey(null)
+                                const status = cleaningPlaceStatuses.find(
+                                  (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
+                                )
+                                const label = String(status?.roomServiceLabel ?? status?.label ?? '').trim().toLowerCase()
+                                if (label === 'need cleaning' || label === 'needs cleaning') {
+                                  const confirmed = window.confirm(
+                                    'This room is currently marked as needing cleaning. Applying will set it to Occupied. Continue?',
+                                  )
+                                  if (!confirmed) return
+                                }
+                                await applyCheckedInRoom(checkin)
+                                const key = `${checkin.room}-${checkin.name}`
+                                setDismissedCheckedIns((current) => {
+                                  const next = new Set([...current, key])
+                                  try {
+                                    window.localStorage.setItem(`dismissed-checkedins-${checkedinDate()}`, JSON.stringify([...next]))
+                                  } catch {
+                                    // Ignore storage failures.
+                                  }
+                                  return next
+                                })
+                                setCheckedIns((current) =>
+                                  current.filter(
+                                    (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                                  ),
+                                )
+                              }}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition hover:bg-slate-50"
+                            >
+                              Apply check-in
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!window.confirm('This check-in will not be shown again today. Continue?')) return
+                                setCheckinMenuKey(null)
+                                const key = `${checkin.room}-${checkin.name}`
+                                setDismissedCheckedIns((current) => {
+                                  const next = new Set([...current, key])
+                                  try {
+                                    window.localStorage.setItem(`dismissed-checkedins-${checkedinDate()}`, JSON.stringify([...next]))
+                                  } catch {
+                                    // Ignore storage failures.
+                                  }
+                                  return next
+                                })
+                                setCheckedIns((current) =>
+                                  current.filter(
+                                    (item) => !(String(item.room) === String(checkin.room) && String(item.name) === String(checkin.name)),
+                                  ),
+                                )
+                              }}
+                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                            >
+                              Cancel for today
+                            </button>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
