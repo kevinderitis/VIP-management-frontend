@@ -455,6 +455,26 @@ export const AdminCleaningTasksPage = () => {
     const currentStatus = cleaningPlaceStatuses.find(
       (entry) => entry.placeType === 'room' && entry.roomCode === String(checkin.room),
     )
+    const bedCount = room?.roomType === 'shared' ? Math.max(1, room.bedCount) : 1
+    const beds = (currentStatus?.beds?.length ? currentStatus.beds : Array.from({ length: bedCount }, (_, index) => ({ bedNumber: index + 1, label: 'Ready', color: '#22c55e' }))).map((bed) => ({ ...bed }))
+
+    const nameMatch = String(checkin.name ?? '').match(/^(\d+)\s*[\/\-]/)
+    let bedNumber = nameMatch ? Number.parseInt(nameMatch[1], 10) : NaN
+    if (Number.isNaN(bedNumber) || bedNumber < 1 || bedNumber > bedCount) {
+      const occupiedBeds = new Set(beds.filter((bed) => bed.label.toLowerCase() === 'occupied').map((bed) => bed.bedNumber))
+      bedNumber = 1
+      for (let candidate = 1; candidate <= bedCount; candidate += 1) {
+        if (!occupiedBeds.has(candidate)) {
+          bedNumber = candidate
+          break
+        }
+      }
+    }
+
+    const nextBeds = beds.map((bed) =>
+      bed.bedNumber === bedNumber ? { ...bed, label: 'Occupied', color: '#3b82f6' } : bed,
+    )
+
     await upsertCleaningPlaceStatus({
       placeType: 'room',
       roomCode: String(checkin.room),
@@ -463,7 +483,7 @@ export const AdminCleaningTasksPage = () => {
       placeLabel: room?.label ?? currentStatus?.placeLabel ?? `Room ${checkin.room}`,
       label: 'Occupied',
       color: '#3b82f6',
-      beds: currentStatus?.beds,
+      beds: nextBeds,
       occupantName: checkin.name,
     })
   }
