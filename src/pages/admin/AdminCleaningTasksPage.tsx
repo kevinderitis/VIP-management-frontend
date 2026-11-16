@@ -991,42 +991,139 @@ export const AdminCleaningTasksPage = () => {
                 <span className="text-sm text-slate-500">{group.rooms.length} rooms</span>
               </div>
               <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
-                {group.rooms.map(({ room, status, cleanerName }) => (
-                  <button
-                    key={room.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedRoom(room)
-                      setRoomModalOpen(true)
-                    }}
-                    className="min-w-0 rounded-[24px] px-4 py-4 text-left text-white shadow-soft transition hover:-translate-y-0.5"
-                    style={{ backgroundColor: status.color }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-display text-xl font-semibold">{room.code}</p>
-                        <p className="mt-1 break-words text-xs font-medium text-white/85">{room.roomType === 'shared' ? `${room.bedCount} beds` : 'Private room'}</p>
-                      </div>
-                      {room.roomType === 'shared' ? <BedDouble size={16} className="text-white/90" /> : null}
-                    </div>
-                    {cleanerName ? (
-                      <p className="mt-2 flex items-start gap-1 break-words text-xs font-semibold text-white">
-                        <UserRound size={13} className="mt-0.5 shrink-0" />
-                        <span className="min-w-0 break-words">{cleanerName}</span>
-                      </p>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {status.badges.map((badge) => (
-                        <span
-                          key={`${room.code}-${badge.label}`}
-                          className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white"
+                {group.rooms.map(({ room, status, cleanerName }) => {
+                  const roomOccupants = activeStays.filter((stay) => stay.roomCode === room.code)
+                  const isShared = room.roomType === 'shared'
+
+                  const assignBed = async (bedNumber: number, stayId: string) => {
+                    if (!token) return
+                    try {
+                      if (stayId) {
+                        const stay = activeStays.find((item) => item.id === stayId)
+                        if (stay && (stay.roomCode !== room.code || stay.bedNumber !== bedNumber)) {
+                          await checkinsApi.update(token, stayId, { roomCode: room.code, bedNumber })
+                        }
+                      } else {
+                        const occupant = roomOccupants.find((stay) => stay.bedNumber === bedNumber)
+                        if (occupant) await checkinsApi.clearRoom(token, occupant.id)
+                      }
+                      await refreshState()
+                    } catch (error) {
+                      console.warn('Could not update bed assignment:', error)
+                    }
+                  }
+
+                  if (isShared) {
+                    return (
+                      <div
+                        key={room.id}
+                        className="min-w-0 rounded-[24px] p-4 text-white shadow-soft"
+                        style={{ backgroundColor: status.color }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-display text-xl font-semibold">{room.code}</p>
+                            <p className="mt-1 break-words text-xs font-medium text-white/85">{room.bedCount} beds</p>
+                          </div>
+                          <BedDouble size={16} className="text-white/90" />
+                        </div>
+                        {cleanerName ? (
+                          <p className="mt-2 flex items-start gap-1 break-words text-xs font-semibold text-white">
+                            <UserRound size={13} className="mt-0.5 shrink-0" />
+                            <span className="min-w-0 break-words">{cleanerName}</span>
+                          </p>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {status.badges.map((badge) => (
+                            <span
+                              key={`${room.code}-${badge.label}`}
+                              className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white"
+                            >
+                              {badge.label}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {Array.from({ length: room.bedCount }, (_, index) => index + 1).map((bed) => {
+                            const occupant = roomOccupants.find((stay) => stay.bedNumber === bed)
+                            const availableStays = activeStays.filter(
+                              (stay) => !stay.roomCode || stay.roomCode === room.code || stay.id === occupant?.id,
+                            )
+                            return (
+                              <div key={bed} className="rounded-xl bg-white/12 p-2">
+                                <div className="mb-1 flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-semibold text-white">Bed {bed}</span>
+                                  <span
+                                    className="h-2.5 w-2.5 rounded-full"
+                                    style={{ backgroundColor: occupant ? '#3b82f6' : 'rgba(255,255,255,0.45)' }}
+                                  />
+                                </div>
+                                <select
+                                  value={occupant?.id ?? ''}
+                                  onChange={(event) => void assignBed(bed, event.target.value)}
+                                  className="w-full rounded-lg border-0 bg-white/90 px-2 py-1 text-xs text-ink"
+                                >
+                                  <option value="">Empty</option>
+                                  {availableStays.map((stay) => (
+                                    <option key={stay.id} value={stay.id}>
+                                      {stay.guestName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRoom(room)
+                            setRoomModalOpen(true)
+                          }}
+                          className="mt-3 w-full rounded-xl bg-white/15 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/25"
                         >
-                          {badge.label}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
+                          Full room settings
+                        </button>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRoom(room)
+                        setRoomModalOpen(true)
+                      }}
+                      className="min-w-0 rounded-[24px] px-4 py-4 text-left text-white shadow-soft transition hover:-translate-y-0.5"
+                      style={{ backgroundColor: status.color }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-display text-xl font-semibold">{room.code}</p>
+                          <p className="mt-1 break-words text-xs font-medium text-white/85">Private room</p>
+                        </div>
+                      </div>
+                      {cleanerName ? (
+                        <p className="mt-2 flex items-start gap-1 break-words text-xs font-semibold text-white">
+                          <UserRound size={13} className="mt-0.5 shrink-0" />
+                          <span className="min-w-0 break-words">{cleanerName}</span>
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {status.badges.map((badge) => (
+                          <span
+                            key={`${room.code}-${badge.label}`}
+                            className="rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white"
+                          >
+                            {badge.label}
+                          </span>
+                        ))}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )) : (
